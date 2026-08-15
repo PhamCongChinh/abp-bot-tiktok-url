@@ -276,12 +276,10 @@ func (f *Fetcher) CrawlURL(ctx context.Context, page playwright.Page, targetURL 
 		log.Sugar().Infof("%s %q -> crawled video: %s", tag, targetURL, string(payload))
 	}
 
-	// PUSH TO API DISABLED FOR LOCAL TESTING — uncomment to push crawled
-	// videos to the backend API.
-	// if len(results) > 0 {
-	// 	f.publisher.PushBatch(ctx, results)
-	// }
-	log.Sugar().Infof("%s %q -> %d videos crawled (push disabled)", tag, targetURL, len(results))
+	if len(results) > 0 {
+		f.publisher.PushBatch(ctx, results)
+	}
+	log.Sugar().Infof("%s %q -> %d videos queued for API push", tag, targetURL, len(results))
 }
 
 // extractStatusCode reads TikTok's response status code, tolerating both the
