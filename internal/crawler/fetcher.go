@@ -2,10 +2,12 @@ package crawler
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"sync"
 	"time"
 
+	"abp-bot-tiktok-url/internal/parser"
 	"abp-bot-tiktok-url/internal/utils"
 	"abp-bot-tiktok-url/pkg/config"
 	"abp-bot-tiktok-url/pkg/gpm"
@@ -266,10 +268,20 @@ func (f *Fetcher) CrawlURL(ctx context.Context, page playwright.Page, targetURL 
 		results = results[:f.cfg.MaxVideosPerURL]
 	}
 
-	if len(results) > 0 {
-		f.publisher.PushBatch(ctx, results)
+	// Log the parsed results before pushing so they're visible even with the
+	// push disabled below.
+	for _, v := range results {
+		post := parser.FromVideoItem(v)
+		payload, _ := json.Marshal(post)
+		log.Sugar().Infof("%s %q -> crawled video: %s", tag, targetURL, string(payload))
 	}
-	log.Sugar().Infof("%s %q -> %d videos queued for API push", tag, targetURL, len(results))
+
+	// PUSH TO API DISABLED FOR LOCAL TESTING — uncomment to push crawled
+	// videos to the backend API.
+	// if len(results) > 0 {
+	// 	f.publisher.PushBatch(ctx, results)
+	// }
+	log.Sugar().Infof("%s %q -> %d videos crawled (push disabled)", tag, targetURL, len(results))
 }
 
 // extractStatusCode reads TikTok's response status code, tolerating both the
