@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"abp-bot-tiktok-url/internal/crawler"
-	"abp-bot-tiktok-url/internal/repository"
+	// "abp-bot-tiktok-url/internal/repository"
 	"abp-bot-tiktok-url/internal/scheduler"
 	"abp-bot-tiktok-url/pkg/config"
-	"abp-bot-tiktok-url/pkg/database"
+	// "abp-bot-tiktok-url/pkg/database"
 	"abp-bot-tiktok-url/pkg/logger"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -61,56 +61,66 @@ func main() {
 		cancel()
 	}()
 
-	// Connect to MongoDB
-	dbCtx, dbCancel := context.WithTimeout(ctx, 30*time.Second)
-	defer dbCancel()
+	// TEMP: MongoDB connection disabled while testing GPM locally.
+	// Uncomment this whole block (and the "internal/repository" + "pkg/database"
+	// imports above) once GPM works — cfg.URLs is populated from the MongoDB
+	// tiktok_url collection this way. Until then, set URLS=... in .env as a
+	// fallback so cfg.URLs (loaded by config.Load()) isn't empty.
+	//
+	// dbCtx, dbCancel := context.WithTimeout(ctx, 30*time.Second)
+	// defer dbCancel()
+	//
+	// mongoDB, err := database.NewMongoDB(dbCtx, cfg.MongoURI, cfg.MongoDB,
+	// 	uint64(cfg.MongoMaxPoolSize), uint64(cfg.MongoMinPoolSize), log)
+	// if err != nil {
+	// 	log.Fatal("Failed to connect MongoDB", zap.Error(err))
+	// }
+	// defer func() { _ = mongoDB.Close() }()
+	//
+	// // Init repositories
+	// urlRepo := repository.NewURLRepository(mongoDB.Database(), log)
+	//
+	// // Load URLs from MongoDB by org_ids from .env
+	// log.Info("Loading URLs from MongoDB", zap.Ints("org_ids", cfg.OrgIDs))
+	//
+	// urlEntries, err := urlRepo.FindByOrgIDs(cfg.OrgIDs)
+	// if err != nil {
+	// 	log.Fatal("Failed to load URLs from MongoDB", zap.Error(err))
+	// }
+	//
+	// log.Info("URLs loaded from MongoDB",
+	// 	zap.Int("count", len(urlEntries)),
+	// 	zap.Ints("org_ids", cfg.OrgIDs),
+	// )
+	//
+	// // Build URL list, org map, and group by org_id
+	// orgURLCount := make(map[int]int)
+	// var urlList []string
+	// urlOrgMap := make(map[string]int)
+	// for _, u := range urlEntries {
+	// 	urlList = append(urlList, u.URL)
+	// 	urlOrgMap[u.URL] = u.OrgID
+	// 	orgURLCount[u.OrgID]++
+	// }
+	//
+	// log.Info("URL distribution by organization:")
+	// for orgID, count := range orgURLCount {
+	// 	log.Info("", zap.Int("org_id", orgID), zap.Int("urls", count))
+	// }
+	//
+	// if len(urlList) == 0 {
+	// 	log.Warn("No URLs found for org_ids, exiting", zap.Ints("org_ids", cfg.OrgIDs))
+	// 	return
+	// }
+	//
+	// // Set URLs to config (will be reused for all crawl cycles, shuffled each cycle in Run())
+	// cfg.URLs = urlList
+	// cfg.URLOrgMap = urlOrgMap
 
-	mongoDB, err := database.NewMongoDB(dbCtx, cfg.MongoURI, cfg.MongoDB,
-		uint64(cfg.MongoMaxPoolSize), uint64(cfg.MongoMinPoolSize), log)
-	if err != nil {
-		log.Fatal("Failed to connect MongoDB", zap.Error(err))
-	}
-	defer func() { _ = mongoDB.Close() }()
-
-	// Init repositories
-	urlRepo := repository.NewURLRepository(mongoDB.Database(), log)
-
-	// Load URLs from MongoDB by org_ids from .env
-	log.Info("Loading URLs from MongoDB", zap.Ints("org_ids", cfg.OrgIDs))
-
-	urlEntries, err := urlRepo.FindByOrgIDs(cfg.OrgIDs)
-	if err != nil {
-		log.Fatal("Failed to load URLs from MongoDB", zap.Error(err))
-	}
-
-	log.Info("URLs loaded from MongoDB",
-		zap.Int("count", len(urlEntries)),
-		zap.Ints("org_ids", cfg.OrgIDs),
-	)
-
-	// Build URL list, org map, and group by org_id
-	orgURLCount := make(map[int]int)
-	var urlList []string
-	urlOrgMap := make(map[string]int)
-	for _, u := range urlEntries {
-		urlList = append(urlList, u.URL)
-		urlOrgMap[u.URL] = u.OrgID
-		orgURLCount[u.OrgID]++
-	}
-
-	log.Info("URL distribution by organization:")
-	for orgID, count := range orgURLCount {
-		log.Info("", zap.Int("org_id", orgID), zap.Int("urls", count))
-	}
-
-	if len(urlList) == 0 {
-		log.Warn("No URLs found for org_ids, exiting", zap.Ints("org_ids", cfg.OrgIDs))
+	if len(cfg.URLs) == 0 {
+		log.Warn("No URLs configured — MongoDB loading is disabled, set URLS=... in .env")
 		return
 	}
-
-	// Set URLs to config (will be reused for all crawl cycles, shuffled each cycle in Run())
-	cfg.URLs = urlList
-	cfg.URLOrgMap = urlOrgMap
 
 	// Init Prometheus metrics for observability.
 	metrics := crawler.NewCrawlerMetrics(prometheus.DefaultRegisterer)
