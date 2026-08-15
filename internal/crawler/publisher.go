@@ -131,7 +131,7 @@ func (p *Publisher) PushToAPI(ctx context.Context, videos []models.VideoItem) er
 
 	// Retry once with backoff for transient API failures.
 	err := utils.RetryWithBackoff(ctx, 2, func() error {
-		return p.apiClient.PostUnclassifiedBatch(ctx, posts)
+		return p.apiClient.PostClassified(ctx, posts)
 	})
 	if err != nil {
 		return fmt.Errorf("pushToAPI: %w", err)
