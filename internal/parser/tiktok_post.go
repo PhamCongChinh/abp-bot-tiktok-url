@@ -61,7 +61,7 @@ func FromVideoItem(v models.VideoItem) TiktokPost {
 		DocType:         docType,
 		CrawlSource:     crawlSource,
 		CrawlSourceCode: crawlSourceCode,
-		OrgID:           v.OrgID,
+		OrgID:           18576, //v.OrgID,
 		PubTime:         v.PubTime,
 		CrawlTime:       time.Now().Unix(),
 		SubjectID:       v.VideoID,
