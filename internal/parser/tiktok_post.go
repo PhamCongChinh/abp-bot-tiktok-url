@@ -88,9 +88,9 @@ func FromVideoItem(v models.VideoItem) TiktokPost {
 		ReplyTo:         nil,
 		Level:           nil,
 		Sentiment:       0,
-		IsPriority:      false,
+		IsPriority:      true,
 		CrawlBot:        crawlBot,
-		SourceOwnership: "nature",
+		SourceOwnership: "own",
 	}
 }
 

@@ -110,8 +110,8 @@ func TestFromVideoItem_Valid(t *testing.T) {
 	if post.Sentiment != 0 {
 		t.Errorf("Sentiment = %d, want 0", post.Sentiment)
 	}
-	if post.IsPriority {
-		t.Error("IsPriority = true, want false")
+	if !post.IsPriority {
+		t.Error("IsPriority = false, want true")
 	}
 	if post.CrawlBot != "tiktok-1" {
 		t.Errorf("CrawlBot = %q, want %q", post.CrawlBot, "tiktok-1")
