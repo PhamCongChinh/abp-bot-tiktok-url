@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sort"
 	"sync"
 	"time"
 
@@ -17,6 +18,10 @@ import (
 	"github.com/playwright-community/playwright-go"
 	"go.uber.org/zap"
 )
+
+// preBrowserPause is how long Run() waits after resolving the URL list —
+// and logging it — before it opens any browser/GPM connection.
+const preBrowserPause = 10 * time.Minute
 
 // Crawler is the top-level orchestrator that coordinates direct-URL crawling
 // across multiple GPM profiles. Each sub-concern (GPM connections, page
@@ -87,6 +92,15 @@ func (c *Crawler) Run(ctx context.Context) {
 		return
 	}
 	c.cfg.URLOrgMap = urlOrgMap
+	c.logURLsByOrg(urls, urlOrgMap)
+
+	c.log.Info("Crawler.Run: pausing before opening browser", zap.Duration("pause", preBrowserPause))
+	select {
+	case <-time.After(preBrowserPause):
+	case <-ctx.Done():
+		c.log.Warn("Crawler.Run: context cancelled during pre-browser pause")
+		return
+	}
 
 	start := time.Now()
 	if c.metrics != nil {
@@ -193,6 +207,30 @@ func (c *Crawler) loadURLs() ([]string, map[string]int, error) {
 	)
 
 	return urls, urlOrgMap, nil
+}
+
+// logURLsByOrg groups urls by their org_id (via urlOrgMap) and logs each
+// group, so the resolved crawl list is visible before the browser opens.
+func (c *Crawler) logURLsByOrg(urls []string, urlOrgMap map[string]int) {
+	byOrg := make(map[int][]string)
+	for _, u := range urls {
+		orgID := urlOrgMap[u]
+		byOrg[orgID] = append(byOrg[orgID], u)
+	}
+
+	orgIDs := make([]int, 0, len(byOrg))
+	for orgID := range byOrg {
+		orgIDs = append(orgIDs, orgID)
+	}
+	sort.Ints(orgIDs)
+
+	for _, orgID := range orgIDs {
+		c.log.Info("loadURLs: URLs for org",
+			zap.Int("org_id", orgID),
+			zap.Int("url_count", len(byOrg[orgID])),
+			zap.Strings("urls", byOrg[orgID]),
+		)
+	}
 }
 
 // splitURLs distributes URLs across n profiles in a round-robin fashion.
