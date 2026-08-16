@@ -60,9 +60,6 @@ type Config struct {
 	// Pagination guards
 	MaxVideosPerURL    int
 	MaxPagesPerSession int
-
-	// Metrics
-	MetricsAddr string
 }
 
 // Load reads configuration from environment variables (with .env file support),
@@ -90,7 +87,6 @@ func Load() (Config, error) {
 	loadAPISettings(&cfg, &errs)
 	loadGpmSettings(&cfg, &errs)
 	loadCrawlSettings(&cfg, &errs)
-	loadMetricsSettings(&cfg, &errs)
 	validateBounds(&cfg, &errs)
 
 	if len(errs) > 0 {
@@ -234,11 +230,6 @@ func loadCrawlSettings(cfg *Config, errs *[]string) {
 
 	cfg.MaxVideosPerURL = optInt(errs, "MAX_VIDEOS_PER_URL", 200)
 	cfg.MaxPagesPerSession = optInt(errs, "MAX_PAGES_PER_SESSION", 20)
-}
-
-// loadMetricsSettings populates observability configuration fields.
-func loadMetricsSettings(cfg *Config, errs *[]string) {
-	cfg.MetricsAddr = optStr(errs, "METRICS_ADDR", ":9090")
 }
 
 // validateBounds checks that paired min/max settings are consistent.

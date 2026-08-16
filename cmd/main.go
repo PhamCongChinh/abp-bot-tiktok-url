@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -18,7 +17,6 @@ import (
 	"abp-bot-tiktok-url/pkg/logger"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 )
 
@@ -84,16 +82,9 @@ func main() {
 	orgRepo := repository.NewOrgRepository(pgDB.Pool)
 	urlRepo := repository.NewURLRepository(mongoDB.Database(), log)
 
-	// Init Prometheus metrics for observability.
+	// Init Prometheus metrics for observability (in-process counters only —
+	// no HTTP /metrics endpoint is exposed).
 	metrics := crawler.NewCrawlerMetrics(prometheus.DefaultRegisterer)
-
-	// Start metrics HTTP server on configured address (e.g. :9090).
-	metricsSrv := startMetricsServer(cfg.MetricsAddr, log)
-	defer func() {
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer shutdownCancel()
-		_ = metricsSrv.Shutdown(shutdownCtx)
-	}()
 
 	// Init crawler
 	c := crawler.New(&cfg, log, nil, orgRepo, urlRepo, metrics)
@@ -128,31 +119,4 @@ func runCrawler(pctx context.Context, cfg *config.Config, log *zap.Logger, c *cr
 	// Block until the parent context is cancelled (signal received).
 	<-ctx.Done()
 	log.Info("Shutting down — closing all profiles...")
-}
-
-// startMetricsServer starts an HTTP server on addr that exposes /metrics for
-// Prometheus scraping. Returns the *http.Server so the caller can shut it down
-// gracefully. Logs a warning and returns a no-op server when addr is empty.
-func startMetricsServer(addr string, log *zap.Logger) *http.Server {
-	if addr == "" {
-		log.Warn("METRICS_ADDR is empty — metrics endpoint disabled")
-		return &http.Server{}
-	}
-
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
-
-	srv := &http.Server{
-		Addr:    addr,
-		Handler: mux,
-	}
-
-	go func() {
-		log.Sugar().Infof("Metrics server listening on %s", addr)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Sugar().Errorf("Metrics server error: %v", err)
-		}
-	}()
-
-	return srv
 }

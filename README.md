@@ -56,11 +56,11 @@ Phần còn lại (GPM, circuit breaker, publisher, scheduler, anti-ban, metrics
 - **GPM (GoLogin Profile Manager)** — quản lý profile trình duyệt anti-detect đã login sẵn, kết nối qua Chrome DevTools Protocol (CDP)
 - **MongoDB** (`mongo-driver`) — nguồn URL và bot config
 - **Zap + lumberjack** — structured logging có rotation
-- **Prometheus client** — expose metrics tại endpoint `/metrics`
+- **Prometheus client** — đếm số liệu (chu kỳ crawl, video crawl được, lỗi API...) trong bộ nhớ; không có HTTP endpoint `/metrics` nào được expose ra ngoài
 - **gopsutil** — kiểm tra CPU/RAM trước khi crawl
 - **godotenv** — load cấu hình từ `.env`
 
-Không có web framework phục vụ request (chỉ có endpoint metrics nội bộ), không dùng queue, không dùng ORM.
+Không có web framework phục vụ request, không mở port HTTP nào, không dùng queue, không dùng ORM.
 
 ## Cài đặt
 
@@ -143,8 +143,6 @@ cp .env.example .env
 
 # MAX_VIDEOS_PER_URL=200       # giới hạn video/URL (chủ yếu áp dụng cho profile URL)
 # MAX_PAGES_PER_SESSION=20     # giới hạn số trang scroll/phiên
-
-# METRICS_ADDR=:9090           # bỏ trống để tắt Prometheus endpoint
 ```
 
 Xem đầy đủ và chú thích chi tiết trong [`.env.example`](.env.example).
@@ -252,7 +250,7 @@ Bot sẽ tự động dùng local Chrome (`UseGPM=false` khi `PROFILE_IDS` rỗn
 7. **Parse & dedup**: trích video ID, mô tả, thời gian đăng, tác giả, số liệu tương tác vào `models.VideoItem`; lọc video cũ hơn 7 ngày; loại trùng theo ID.
 8. **Đẩy kết quả**: convert `VideoItem` → `TiktokPost`, đẩy bất đồng bộ (buffered channel + worker pool, batch tối đa 10 hoặc mỗi 5s) sang backend API tại `POST {API_URL}/api/v1/posts/insert-unclassified-org-posts`.
 9. **Guardrail chống ban**: batch size, sleep ngẫu nhiên giữa URL (`SLEEP_MIN/MAX_URL`) và giữa session (`REST_MIN/MAX_SESSION`), giới hạn video/URL và số trang/session, tạm nghỉ crawl 00:00-03:00.
-10. **Observability**: Prometheus counter/histogram cho số chu kỳ crawl, số video crawl được, lỗi push API, thời lượng crawl — expose tại `METRICS_ADDR` (`/metrics`).
+10. **Observability**: Prometheus counter/histogram cho số chu kỳ crawl, số video crawl được, lỗi push API, thời lượng crawl — đếm trong bộ nhớ tiến trình, không expose HTTP endpoint nào ra ngoài.
 
 ## PostgreSQL Tables
 
@@ -324,7 +322,7 @@ Video crawl được **không** ghi trực tiếp vào MongoDB trong luồng hi�
 - ✅ Batch processing với random sleep giữa URL/session
 - ✅ Scheduler lặp 30-45 phút, tự nghỉ khung giờ đêm (00:00-03:00)
 - ✅ Structured logging (Zap) có rotation
-- ✅ Prometheus metrics (`/metrics`)
+- ✅ Prometheus metrics nội bộ (không có HTTP endpoint expose ra ngoài)
 - ✅ Retry/backoff + circuit breaker khi kết nối GPM/CDP lỗi
 
 ## Anti-ban
