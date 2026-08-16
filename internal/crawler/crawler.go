@@ -21,7 +21,7 @@ import (
 
 // preBrowserPause is how long Run() waits after resolving the URL list —
 // and logging it — before it opens any browser/GPM connection.
-const preBrowserPause = 10 * time.Minute
+const preBrowserPause = 5 * time.Second
 
 // Crawler is the top-level orchestrator that coordinates direct-URL crawling
 // across multiple GPM profiles. Each sub-concern (GPM connections, page
