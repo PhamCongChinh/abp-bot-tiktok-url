@@ -2,7 +2,6 @@ package crawler
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"sync"
 	"time"
@@ -279,8 +278,8 @@ func (f *Fetcher) CrawlURL(ctx context.Context, page playwright.Page, targetURL 
 	// Log the parsed results before pushing so they're visible in logs too.
 	for _, v := range results {
 		post := parser.FromVideoItem(v)
-		payload, _ := json.Marshal(post)
-		log.Sugar().Infof("%s %q -> crawled video: %s", tag, targetURL, string(payload))
+		log.Sugar().Infof("%s %q -> crawled video: org_id=%d url=%s source_ownership=%s",
+			tag, targetURL, post.OrgID, post.URL, post.SourceOwnership)
 	}
 
 	if len(results) > 0 {
