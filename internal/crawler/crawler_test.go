@@ -61,8 +61,8 @@ func TestLoadURLs_QueriesMongoWhenWired(t *testing.T) {
 		log: zap.NewNop(),
 		orgRepo: &fakeOrgStore{orgs: []repository.Org{{OrgID: 1, Name: "Org One"}, {OrgID: 2, Name: "Org Two"}}},
 		urlRepo: &fakeURLStore{entries: []repository.URLEntry{
-			{URL: "https://www.tiktok.com/@user1", OrgID: 1, Active: true},
-			{URL: "https://www.tiktok.com/@user2", OrgID: 2, Active: false},
+			{URL: "https://www.tiktok.com/@user1", ProjectID: []int{1}, Source: "tiktok"},
+			{URL: "https://www.tiktok.com/@user2", ProjectID: []int{99}, Source: "tiktok"},
 		}},
 	}
 
@@ -71,7 +71,7 @@ func TestLoadURLs_QueriesMongoWhenWired(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(urls) != 1 || urls[0] != "https://www.tiktok.com/@user1" {
-		t.Errorf("urls = %v, want only the active URL", urls)
+		t.Errorf("urls = %v, want only the URL whose projectId matches an active org", urls)
 	}
 	if urlOrgMap["https://www.tiktok.com/@user1"] != 1 {
 		t.Errorf("urlOrgMap[user1] = %d, want 1", urlOrgMap["https://www.tiktok.com/@user1"])

@@ -127,10 +127,11 @@ launch:
 }
 
 // loadURLs resolves the URL list to crawl this cycle. When orgRepo/urlRepo
-// are wired (MongoDB configured), it queries active orgs from the `org`
-// collection (status="ACTIVE"), then their URLs from `tiktok_url`, so
-// enabling/disabling an org takes effect on the next crawl cycle without a
-// bot restart. Otherwise it falls back to the static cfg.URLs/cfg.URLOrgMap
+// are wired (PostgreSQL + MongoDB configured), it queries active orgs from
+// `tbl_org` (status="ACTIVE"), then their URLs from Mongo's `source_crawl`
+// collection (projectId in activeOrgIDs, source="tiktok"), so enabling/
+// disabling an org takes effect on the next crawl cycle without a bot
+// restart. Otherwise it falls back to the static cfg.URLs/cfg.URLOrgMap
 // loaded from the URLS env var (local runs, tests).
 func (c *Crawler) loadURLs() ([]string, map[string]int, error) {
 	if c.orgRepo == nil || c.urlRepo == nil {
@@ -159,14 +160,31 @@ func (c *Crawler) loadURLs() ([]string, map[string]int, error) {
 		return nil, nil, fmt.Errorf("loadURLs: FindByOrgIDs: %w", err)
 	}
 
+	activeOrgSet := make(map[int]bool, len(orgIDs))
+	for _, id := range orgIDs {
+		activeOrgSet[id] = true
+	}
+
 	urls := make([]string, 0, len(urlEntries))
 	urlOrgMap := make(map[string]int, len(urlEntries))
 	for _, u := range urlEntries {
-		if !u.Active {
+		// projectId is an array — attribute the URL to whichever active
+		// org_id it belongs to (a URL doc may list multiple projects).
+		matchedOrgID := 0
+		for _, pid := range u.ProjectID {
+			if activeOrgSet[pid] {
+				matchedOrgID = pid
+				break
+			}
+		}
+		if matchedOrgID == 0 {
+			c.log.Warn("loadURLs: source_crawl doc matched query but has no active org_id in projectId, skipping",
+				zap.String("url", u.URL),
+			)
 			continue
 		}
 		urls = append(urls, u.URL)
-		urlOrgMap[u.URL] = u.OrgID
+		urlOrgMap[u.URL] = matchedOrgID
 	}
 
 	c.log.Info("loadURLs: loaded active URLs from MongoDB",

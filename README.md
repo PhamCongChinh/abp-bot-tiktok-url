@@ -1,6 +1,6 @@
 # ABP Bot TikTok URL
 
-Bot crawl TikTok theo **danh sách URL cho sẵn** (video hoặc profile) viết bằng Go, dùng Playwright điều khiển trình duyệt thật (qua GPM/GoLogin hoặc Chrome local). Khác với `abp-bot-tiktok` (crawl theo từ khóa tìm kiếm), bot này đọc danh sách URL TikTok từ MongoDB (lọc theo org_id đang active), mở trực tiếp từng URL (không qua search), lấy dữ liệu qua network interception, rồi đẩy video thu được sang một backend API bên ngoài. Danh sách org_id đang active được lấy từ **PostgreSQL** (bảng `org`), URL cụ thể của từng org vẫn lấy từ **MongoDB** (collection `tiktok_url`).
+Bot crawl TikTok theo **danh sách URL cho sẵn** (video hoặc profile) viết bằng Go, dùng Playwright điều khiển trình duyệt thật (qua GPM/GoLogin hoặc Chrome local). Khác với `abp-bot-tiktok` (crawl theo từ khóa tìm kiếm), bot này đọc danh sách URL TikTok từ MongoDB (lọc theo org_id đang active), mở trực tiếp từng URL (không qua search), lấy dữ liệu qua network interception, rồi đẩy video thu được sang một backend API bên ngoài. Danh sách org_id đang active được lấy từ **PostgreSQL** (bảng `tbl_org`), URL cụ thể của từng org lấy từ **MongoDB** (collection `source_crawl`, lọc `projectId` chứa org_id và `source: "tiktok"`).
 
 ## Cấu trúc
 
@@ -19,7 +19,7 @@ Bot crawl TikTok theo **danh sách URL cho sẵn** (video hoặc profile) viết
 │   ├── parser/tiktok_post.go  # Map VideoItem -> TiktokPost (payload gửi backend API)
 │   ├── repository/
 │   │   ├── org_repo.go         #   (PostgreSQL) đọc bảng `org`, trả về org_id đang status=ACTIVE
-│   │   ├── url_repo.go         #   (MongoDB) đọc collection `tiktok_url`
+│   │   ├── url_repo.go         #   (MongoDB) đọc collection `source_crawl` (source="tiktok")
 │   │   ├── bot_config_repo.go  #   (MongoDB) đọc/ghi config bot
 │   │   └── video_repo.go       #   (MongoDB) interface lưu video (hiện không dùng, xem ghi chú bên dưới)
 │   ├── scheduler/scheduler.go # Lặp crawl mỗi 30-45 phút, tạm nghỉ 00:00-03:00
@@ -41,7 +41,7 @@ Bot crawl TikTok theo **danh sách URL cho sẵn** (video hoặc profile) viết
 
 | | `abp-bot-tiktok` | `abp-bot-tiktok-url` (bản này) |
 | --- | --- | --- |
-| Đầu vào | Từ khóa (`keyword` collection) | URL TikTok cho sẵn (`tiktok_url` collection) |
+| Đầu vào | Từ khóa (`keyword` collection) | URL TikTok cho sẵn (`source_crawl` collection, `source: "tiktok"`) |
 | Điều hướng | `tiktok.com/search?q=...` | Mở thẳng URL video hoặc profile |
 | Nguồn dữ liệu | XHR `/api/search/item/full/` | XHR `/api/item/detail/` (video) hoặc `/api/post/item_list/` (profile) |
 | Phân trang | Scroll trang search | Scroll trang profile (video đơn thì không cần) |
@@ -102,7 +102,7 @@ cp .env.example .env
 | Biến | Ý nghĩa |
 | --- | --- |
 | `BOT_NAME` | Tên bot instance (dùng trong bot_config Mongo) |
-| `MONGO_URI` | Connection string MongoDB (nguồn URL crawl — collection `tiktok_url`) |
+| `MONGO_URI` | Connection string MongoDB (nguồn URL crawl — collection `source_crawl`) |
 | `MONGO_DB` | Tên database Mongo |
 | `PG_DSN` | Connection string PostgreSQL, vd `postgres://user:pass@localhost:5432/dbname?sslmode=disable` (nguồn org active — bảng `tbl_org`) |
 | `GPM_API` | URL base của GPM API, vd `http://localhost:50325/api/v1` |
@@ -239,7 +239,7 @@ Bot sẽ tự động dùng local Chrome (`UseGPM=false` khi `PROFILE_IDS` rỗn
 
 ## Luồng hoạt động
 
-1. **Load config & URL**: đọc `.env`, kết nối MongoDB và PostgreSQL khi khởi động. Mỗi chu kỳ crawl (không chỉ lúc khởi động), bot tự truy vấn lại: lấy danh sách `org_id` đang `status = 'ACTIVE'` từ bảng `org` trong **PostgreSQL**, sau đó lấy các URL đang `active: true` thuộc những `org_id` đó từ collection `tiktok_url` trong **MongoDB**. Nhờ vậy bật/tắt một org có hiệu lực ngay từ chu kỳ crawl tiếp theo mà không cần restart bot (biến `ORG_IDS` trong `.env` không còn được dùng để lọc org nữa).
+1. **Load config & URL**: đọc `.env`, kết nối MongoDB và PostgreSQL khi khởi động. Mỗi chu kỳ crawl (không chỉ lúc khởi động), bot tự truy vấn lại: lấy danh sách `org_id` đang `status = 'ACTIVE'` từ bảng `tbl_org` trong **PostgreSQL**, sau đó lấy các document trong collection `source_crawl` (**MongoDB**) có `projectId` chứa một trong các `org_id` đó và `source: "tiktok"`. Mỗi URL được gán về org_id khớp trong mảng `projectId` của nó. Nhờ vậy bật/tắt một org (đổi `status` trong Postgres) hoặc thêm/bớt URL (sửa `source_crawl`) có hiệu lực ngay từ chu kỳ crawl tiếp theo mà không cần restart bot (biến `ORG_IDS` trong `.env` không còn được dùng để lọc org nữa).
 2. **Fan-out theo profile**: với mỗi `PROFILE_ID` trong `PROFILE_IDS`, chạy một goroutine riêng (lệch nhau 15-45s), xử lý một phần (shard) danh sách URL.
 3. **Kết nối browser**: gọi GPM API start profile đã login sẵn, lấy CDP endpoint, connect Playwright vào (fallback Chrome local nếu không cấu hình GPM).
 4. **Phân loại URL**: URL chứa `/video/` → video đơn; URL chứa `/@username` (không có `/video/`) → trang profile; URL không khớp mẫu nào → bỏ qua.
@@ -264,22 +264,34 @@ CREATE TABLE tbl_org (
 );
 ```
 
-Được truy vấn lại mỗi chu kỳ crawl (`internal/repository/org_repo.go` → `FindActiveOrgIDs()`, query `SELECT t.org_id, t.name FROM tbl_org t WHERE t.status = 'ACTIVE'`) để lấy danh sách `org_id` hiện đang active, dùng làm filter khi lấy URL từ `tiktok_url` bên dưới (MongoDB).
+Được truy vấn lại mỗi chu kỳ crawl (`internal/repository/org_repo.go` → `FindActiveOrgs()`, query `SELECT t.org_id, t.name FROM tbl_org t WHERE t.status = 'ACTIVE'`) để lấy danh sách `org_id` hiện đang active, dùng làm filter khi lấy URL từ `source_crawl` bên dưới (MongoDB).
 
 ## MongoDB Collections
 
-### `tiktok_url` (đầu vào)
+### `source_crawl` (đầu vào)
+
+Collection dùng chung cho nhiều nguồn crawl khác (`source: "youtube"`, `"facebook"`,...); bot này chỉ lấy các document có `source: "tiktok"`.
 
 ```javascript
 {
   _id: ObjectId("..."),
+  seq: NumberLong(2115),
+  orgId: "[18576]",          // không dùng — field này bị serialize lỗi dạng string, xem projectId bên dưới
+  projectId: [ NumberInt(18576) ],  // dùng field này để match org_id, có thể chứa nhiều org_id
+  source_type: "user",
+  source: "tiktok",          // bot chỉ lấy document có source = "tiktok"
+  name: "Some Channel",
   url: "https://www.tiktok.com/@someuser/video/7123456789012345678",
-  org_id: 1,
-  active: true
+  source_ownership: "own",
+  created: NumberLong(1775639358),
+  updated: NumberLong(1775639358),
+  creator: "someone@example.com"
 }
 ```
 
-URL có thể là:
+Query thực tế (`internal/repository/url_repo.go` → `FindByOrgIDs()`): `{projectId: {$in: activeOrgIDs}, source: "tiktok"}`. Vì `projectId` là mảng, một URL có thể thuộc nhiều org — bot gán URL đó về org_id đầu tiên khớp với danh sách org đang active để đính kèm vào payload đẩy lên backend API.
+
+`url` có thể là:
 - **Video**: `https://www.tiktok.com/@username/video/<id>` — crawl đúng 1 video đó.
 - **Profile**: `https://www.tiktok.com/@username` — crawl các video mới nhất trên trang profile (theo `MAX_VIDEOS_PER_URL`).
 
@@ -371,7 +383,7 @@ SELECT t.org_id, t.name FROM tbl_org t WHERE t.status = 'ACTIVE';
 
 ```javascript
 // MongoDB
-db.tiktok_url.find({org_id: {$in: [1,2,3]}, active: true})
+db.source_crawl.find({projectId: {$in: [1,2,3]}, source: "tiktok"})
 ```
 
 Bot tự truy vấn lại cả hai (Postgres cho org, Mongo cho URL) mỗi chu kỳ, nên chỉ cần cập nhật dữ liệu (bật `status = 'ACTIVE'` cho org trong Postgres, hoặc `active: true` cho URL trong Mongo) là chu kỳ crawl tiếp theo sẽ tự nhận, không cần restart.
@@ -401,7 +413,7 @@ Bot tự truy vấn lại cả hai (Postgres cho org, Mongo cho URL) mỗi chu k
 
 ### URL bị bỏ qua ("unsupported URL")
 
-→ URL không khớp mẫu video (`/video/`) hoặc profile (`/@username`). Kiểm tra lại URL trong `tiktok_url`, phải là link TikTok hợp lệ dạng `https://www.tiktok.com/@user` hoặc `https://www.tiktok.com/@user/video/<id>`.
+→ URL không khớp mẫu video (`/video/`) hoặc profile (`/@username`). Kiểm tra lại document trong `source_crawl`, trường `url` phải là link TikTok hợp lệ dạng `https://www.tiktok.com/@user` hoặc `https://www.tiktok.com/@user/video/<id>`.
 
 ### Video không được đẩy sang backend
 

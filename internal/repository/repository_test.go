@@ -78,15 +78,15 @@ func TestURL_FindByOrgIDs(t *testing.T) {
 		}
 
 		expected := []URLEntry{
-			{ID: primitive.NewObjectID(), URL: "https://www.tiktok.com/@user1", OrgID: 1, Active: true},
-			{ID: primitive.NewObjectID(), URL: "https://www.tiktok.com/@user2/video/123", OrgID: 2, Active: true},
+			{ID: primitive.NewObjectID(), URL: "https://www.tiktok.com/@user1", ProjectID: []int{1}, Source: "tiktok"},
+			{ID: primitive.NewObjectID(), URL: "https://www.tiktok.com/@user2/video/123", ProjectID: []int{2}, Source: "tiktok"},
 		}
 
-		first := mtest.CreateCursorResponse(1, "test.tiktok_url", mtest.FirstBatch,
+		first := mtest.CreateCursorResponse(1, "test.source_crawl", mtest.FirstBatch,
 			mustMarshalBSON(mt, expected[0]),
 			mustMarshalBSON(mt, expected[1]),
 		)
-		killCursors := mtest.CreateCursorResponse(0, "test.tiktok_url", mtest.NextBatch)
+		killCursors := mtest.CreateCursorResponse(0, "test.source_crawl", mtest.NextBatch)
 		mt.AddMockResponses(first, killCursors)
 
 		results, err := repo.FindByOrgIDs([]int{1, 2})
@@ -110,8 +110,8 @@ func TestURL_FindByOrgIDs(t *testing.T) {
 			log:        repoTestLogger(),
 		}
 
-		first := mtest.CreateCursorResponse(1, "test.tiktok_url", mtest.FirstBatch)
-		killCursors := mtest.CreateCursorResponse(0, "test.tiktok_url", mtest.NextBatch)
+		first := mtest.CreateCursorResponse(1, "test.source_crawl", mtest.FirstBatch)
+		killCursors := mtest.CreateCursorResponse(0, "test.source_crawl", mtest.NextBatch)
 		mt.AddMockResponses(first, killCursors)
 
 		results, err := repo.FindByOrgIDs([]int{999})
@@ -120,38 +120,6 @@ func TestURL_FindByOrgIDs(t *testing.T) {
 		}
 		if len(results) != 0 {
 			mt.Errorf("expected 0 results, got %d", len(results))
-		}
-	})
-}
-
-func TestURL_FindActive(t *testing.T) {
-	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-
-	mt.Run("find active urls", func(mt *mtest.T) {
-		repo := &URLRepository{
-			collection: mt.Coll,
-			log:        repoTestLogger(),
-		}
-
-		expected := []URLEntry{
-			{ID: primitive.NewObjectID(), URL: "https://www.tiktok.com/@active1", OrgID: 10, Active: true},
-		}
-
-		first := mtest.CreateCursorResponse(1, "test.tiktok_url", mtest.FirstBatch,
-			mustMarshalBSON(mt, expected[0]),
-		)
-		killCursors := mtest.CreateCursorResponse(0, "test.tiktok_url", mtest.NextBatch)
-		mt.AddMockResponses(first, killCursors)
-
-		results, err := repo.FindActive()
-		if err != nil {
-			mt.Fatalf("unexpected error: %v", err)
-		}
-		if len(results) != 1 {
-			mt.Fatalf("expected 1 result, got %d", len(results))
-		}
-		if results[0].Active != true {
-			mt.Errorf("expected Active=true, got %v", results[0].Active)
 		}
 	})
 }
@@ -433,19 +401,19 @@ func TestVideoRepository_FindBySourceURL(t *testing.T) {
 func TestURLModel(t *testing.T) {
 	id := primitive.NewObjectID()
 	u := URLEntry{
-		ID:     id,
-		URL:    "https://www.tiktok.com/@testuser",
-		OrgID:  42,
-		Active: true,
+		ID:        id,
+		URL:       "https://www.tiktok.com/@testuser",
+		ProjectID: []int{42},
+		Source:    "tiktok",
 	}
 	if u.URL != "https://www.tiktok.com/@testuser" {
 		t.Errorf("URL = %q, want %q", u.URL, "https://www.tiktok.com/@testuser")
 	}
-	if u.OrgID != 42 {
-		t.Errorf("OrgID = %d, want 42", u.OrgID)
+	if len(u.ProjectID) != 1 || u.ProjectID[0] != 42 {
+		t.Errorf("ProjectID = %v, want [42]", u.ProjectID)
 	}
-	if !u.Active {
-		t.Error("expected Active=true")
+	if u.Source != "tiktok" {
+		t.Errorf("Source = %q, want %q", u.Source, "tiktok")
 	}
 	if u.ID != id {
 		t.Error("ID mismatch")
