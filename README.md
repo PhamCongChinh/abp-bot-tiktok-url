@@ -237,7 +237,7 @@ Bot sẽ tự động dùng local Chrome (`UseGPM=false` khi `PROFILE_IDS` rỗn
 
 ## Luồng hoạt động
 
-1. **Load config & URL**: đọc `.env`, kết nối MongoDB, lấy danh sách URL đang active theo `ORG_IDS` từ collection `tiktok_url`.
+1. **Load config & URL**: đọc `.env`, kết nối MongoDB khi khởi động. Mỗi chu kỳ crawl (không chỉ lúc khởi động), bot tự truy vấn lại: lấy danh sách `org_id` đang `status: "ACTIVE"` từ collection `org`, sau đó lấy các URL đang `active: true` thuộc những `org_id` đó từ collection `tiktok_url`. Nhờ vậy bật/tắt một org có hiệu lực ngay từ chu kỳ crawl tiếp theo mà không cần restart bot (biến `ORG_IDS` trong `.env` không còn được dùng để lọc org nữa).
 2. **Fan-out theo profile**: với mỗi `PROFILE_ID` trong `PROFILE_IDS`, chạy một goroutine riêng (lệch nhau 15-45s), xử lý một phần (shard) danh sách URL.
 3. **Kết nối browser**: gọi GPM API start profile đã login sẵn, lấy CDP endpoint, connect Playwright vào (fallback Chrome local nếu không cấu hình GPM).
 4. **Phân loại URL**: URL chứa `/video/` → video đơn; URL chứa `/@username` (không có `/video/`) → trang profile; URL không khớp mẫu nào → bỏ qua.
@@ -251,6 +251,18 @@ Bot sẽ tự động dùng local Chrome (`UseGPM=false` khi `PROFILE_IDS` rỗn
 10. **Observability**: Prometheus counter/histogram cho số chu kỳ crawl, số video crawl được, lỗi push API, thời lượng crawl — expose tại `METRICS_ADDR` (`/metrics`).
 
 ## MongoDB Collections
+
+### `org` (danh sách tổ chức được crawl)
+
+```javascript
+{
+  _id: ObjectId("..."),
+  org_id: 1,
+  status: "ACTIVE"   // chỉ org có status="ACTIVE" mới được crawl
+}
+```
+
+Được truy vấn lại mỗi chu kỳ crawl (`internal/repository/org_repo.go` → `FindActiveOrgIDs()`) để lấy danh sách `org_id` hiện đang active, dùng làm filter khi lấy URL từ `tiktok_url` bên dưới.
 
 ### `tiktok_url` (đầu vào)
 
@@ -344,13 +356,16 @@ go run github.com/playwright-community/playwright-go/cmd/playwright@v0.5700.1 in
 
 → Kiểm tra `PROFILE_IDS` đúng chưa. Không dùng giá trị placeholder mẫu.
 
-### Lỗi: "No URLs found for org_ids"
+### Log: "no active orgs found in `org` collection (status=ACTIVE)" / "no active URLs to crawl this cycle, skipping"
 
-→ Kiểm tra MongoDB có URL với `org_id` đó chưa:
+→ Bot không lỗi (không crash) nhưng bỏ qua chu kỳ crawl đó. Kiểm tra:
 
 ```javascript
-db.tiktok_url.find({org_id: {$in: [1,2,3]}})
+db.org.find({status: "ACTIVE"})
+db.tiktok_url.find({org_id: {$in: [1,2,3]}, active: true})
 ```
+
+Bot tự truy vấn lại 2 collection này mỗi chu kỳ, nên chỉ cần cập nhật Mongo (bật `status: "ACTIVE"` cho org, hoặc `active: true` cho URL) là chu kỳ crawl tiếp theo sẽ tự nhận, không cần restart.
 
 ### Lỗi: "Failed to connect GPM"
 

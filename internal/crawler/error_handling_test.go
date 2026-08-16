@@ -358,7 +358,7 @@ func TestNew_CreatesAPIClient(t *testing.T) {
 		HTTPTimeoutSeconds: 30,
 	}
 	log := zap.NewNop()
-	c := New(cfg, log, nil, nil)
+	c := New(cfg, log, nil, nil, nil, nil)
 	if c == nil {
 		t.Fatal("New returned nil")
 	}
@@ -387,7 +387,7 @@ func TestNew_NoAPIClientWhenEmptyURL(t *testing.T) {
 		APIURL: "",
 	}
 	log := zap.NewNop()
-	c := New(cfg, log, nil, nil)
+	c := New(cfg, log, nil, nil, nil, nil)
 	if c.apiClient != nil {
 		t.Error("apiClient should be nil when APIURL is empty")
 	}

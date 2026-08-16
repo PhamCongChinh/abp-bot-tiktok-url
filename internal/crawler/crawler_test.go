@@ -1,8 +1,113 @@
 package crawler
 
 import (
+	"errors"
 	"testing"
+
+	"abp-bot-tiktok-url/internal/repository"
+	"abp-bot-tiktok-url/pkg/config"
+
+	"go.uber.org/zap"
 )
+
+// fakeOrgStore is a test double for repository.OrgStore.
+type fakeOrgStore struct {
+	orgIDs []int
+	err    error
+}
+
+func (f *fakeOrgStore) FindActiveOrgIDs() ([]int, error) {
+	return f.orgIDs, f.err
+}
+
+// fakeURLStore is a test double for repository.URLStore.
+type fakeURLStore struct {
+	entries []repository.URLEntry
+	err     error
+}
+
+func (f *fakeURLStore) FindByOrgIDs(orgIDs []int) ([]repository.URLEntry, error) {
+	return f.entries, f.err
+}
+
+func (f *fakeURLStore) FindActive() ([]repository.URLEntry, error) {
+	return f.entries, f.err
+}
+
+func TestLoadURLs_FallsBackToStaticConfig(t *testing.T) {
+	c := &Crawler{
+		cfg: &config.Config{
+			URLs:      []string{"https://www.tiktok.com/@user1"},
+			URLOrgMap: map[string]int{"https://www.tiktok.com/@user1": 1},
+		},
+		log: zap.NewNop(),
+	}
+
+	urls, urlOrgMap, err := c.loadURLs()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(urls) != 1 || urls[0] != "https://www.tiktok.com/@user1" {
+		t.Errorf("urls = %v, want [https://www.tiktok.com/@user1]", urls)
+	}
+	if urlOrgMap["https://www.tiktok.com/@user1"] != 1 {
+		t.Errorf("urlOrgMap[...] = %d, want 1", urlOrgMap["https://www.tiktok.com/@user1"])
+	}
+}
+
+func TestLoadURLs_QueriesMongoWhenWired(t *testing.T) {
+	c := &Crawler{
+		cfg: &config.Config{},
+		log: zap.NewNop(),
+		orgRepo: &fakeOrgStore{orgIDs: []int{1, 2}},
+		urlRepo: &fakeURLStore{entries: []repository.URLEntry{
+			{URL: "https://www.tiktok.com/@user1", OrgID: 1, Active: true},
+			{URL: "https://www.tiktok.com/@user2", OrgID: 2, Active: false},
+		}},
+	}
+
+	urls, urlOrgMap, err := c.loadURLs()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(urls) != 1 || urls[0] != "https://www.tiktok.com/@user1" {
+		t.Errorf("urls = %v, want only the active URL", urls)
+	}
+	if urlOrgMap["https://www.tiktok.com/@user1"] != 1 {
+		t.Errorf("urlOrgMap[user1] = %d, want 1", urlOrgMap["https://www.tiktok.com/@user1"])
+	}
+}
+
+func TestLoadURLs_NoActiveOrgs(t *testing.T) {
+	c := &Crawler{
+		cfg:     &config.Config{},
+		log:     zap.NewNop(),
+		orgRepo: &fakeOrgStore{orgIDs: nil},
+		urlRepo: &fakeURLStore{},
+	}
+
+	urls, _, err := c.loadURLs()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(urls) != 0 {
+		t.Errorf("urls = %v, want empty", urls)
+	}
+}
+
+func TestLoadURLs_PropagatesOrgRepoError(t *testing.T) {
+	c := &Crawler{
+		cfg:     &config.Config{},
+		log:     zap.NewNop(),
+		orgRepo: &fakeOrgStore{err: errors.New("mongo down")},
+		urlRepo: &fakeURLStore{},
+	}
+
+	_, _, err := c.loadURLs()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
 
 func TestSplitURLs(t *testing.T) {
 	tests := []struct {

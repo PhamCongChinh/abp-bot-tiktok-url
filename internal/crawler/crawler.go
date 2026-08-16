@@ -26,6 +26,8 @@ type Crawler struct {
 	cfg       *config.Config
 	log       *zap.Logger
 	videoRepo repository.VideoStore
+	orgRepo   repository.OrgStore
+	urlRepo   repository.URLStore
 	apiClient api.APIClient
 	gpmSvc    *GPMService
 	scraper   *Scraper
@@ -34,8 +36,10 @@ type Crawler struct {
 	metrics   *CrawlerMetrics
 }
 
-// New creates a fully wired Crawler with all sub-services.
-func New(cfg *config.Config, log *zap.Logger, videoRepo repository.VideoStore, metrics *CrawlerMetrics) *Crawler {
+// New creates a fully wired Crawler with all sub-services. orgRepo/urlRepo
+// may be nil (e.g. in tests or when MongoDB is not wired) — Run() then falls
+// back to the static cfg.URLs/cfg.URLOrgMap loaded from the URLS env var.
+func New(cfg *config.Config, log *zap.Logger, videoRepo repository.VideoStore, orgRepo repository.OrgStore, urlRepo repository.URLStore, metrics *CrawlerMetrics) *Crawler {
 	var apiClient api.APIClient
 	if cfg.APIURL != "" {
 		apiClient = api.NewClient(cfg.APIURL, time.Duration(cfg.HTTPTimeoutSeconds)*time.Second, log)
@@ -49,6 +53,8 @@ func New(cfg *config.Config, log *zap.Logger, videoRepo repository.VideoStore, m
 		cfg:       cfg,
 		log:       log,
 		videoRepo: videoRepo,
+		orgRepo:   orgRepo,
+		urlRepo:   urlRepo,
 		apiClient: apiClient,
 		gpmSvc:    gpmSvc,
 		scraper:   scraper,
@@ -71,6 +77,17 @@ func (c *Crawler) Run(ctx context.Context) {
 		return
 	}
 
+	urls, urlOrgMap, err := c.loadURLs()
+	if err != nil {
+		c.log.Error("Crawler.Run: failed to load URLs", zap.Error(err))
+		return
+	}
+	if len(urls) == 0 {
+		c.log.Warn("Crawler.Run: no active URLs to crawl this cycle, skipping")
+		return
+	}
+	c.cfg.URLOrgMap = urlOrgMap
+
 	start := time.Now()
 	if c.metrics != nil {
 		c.metrics.IncCrawlCycles()
@@ -81,8 +98,6 @@ func (c *Crawler) Run(ctx context.Context) {
 		}
 	}()
 
-	urls := make([]string, len(c.cfg.URLs))
-	copy(urls, c.cfg.URLs)
 	rand.Shuffle(len(urls), func(i, j int) {
 		urls[i], urls[j] = urls[j], urls[i]
 	})
@@ -109,6 +124,51 @@ launch:
 		}
 	}
 	wg.Wait()
+}
+
+// loadURLs resolves the URL list to crawl this cycle. When orgRepo/urlRepo
+// are wired (MongoDB configured), it queries active orgs from the `org`
+// collection (status="ACTIVE"), then their URLs from `tiktok_url`, so
+// enabling/disabling an org takes effect on the next crawl cycle without a
+// bot restart. Otherwise it falls back to the static cfg.URLs/cfg.URLOrgMap
+// loaded from the URLS env var (local runs, tests).
+func (c *Crawler) loadURLs() ([]string, map[string]int, error) {
+	if c.orgRepo == nil || c.urlRepo == nil {
+		urls := make([]string, len(c.cfg.URLs))
+		copy(urls, c.cfg.URLs)
+		return urls, c.cfg.URLOrgMap, nil
+	}
+
+	orgIDs, err := c.orgRepo.FindActiveOrgIDs()
+	if err != nil {
+		return nil, nil, fmt.Errorf("loadURLs: FindActiveOrgIDs: %w", err)
+	}
+	if len(orgIDs) == 0 {
+		c.log.Warn("loadURLs: no active orgs found in `org` collection (status=ACTIVE)")
+		return nil, nil, nil
+	}
+
+	urlEntries, err := c.urlRepo.FindByOrgIDs(orgIDs)
+	if err != nil {
+		return nil, nil, fmt.Errorf("loadURLs: FindByOrgIDs: %w", err)
+	}
+
+	urls := make([]string, 0, len(urlEntries))
+	urlOrgMap := make(map[string]int, len(urlEntries))
+	for _, u := range urlEntries {
+		if !u.Active {
+			continue
+		}
+		urls = append(urls, u.URL)
+		urlOrgMap[u.URL] = u.OrgID
+	}
+
+	c.log.Info("loadURLs: loaded active URLs from MongoDB",
+		zap.Int("active_org_count", len(orgIDs)),
+		zap.Int("active_url_count", len(urls)),
+	)
+
+	return urls, urlOrgMap, nil
 }
 
 // splitURLs distributes URLs across n profiles in a round-robin fashion.

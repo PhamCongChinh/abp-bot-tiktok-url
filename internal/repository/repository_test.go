@@ -504,6 +504,66 @@ func TestVideoDocumentModel(t *testing.T) {
 	}
 }
 
+func TestNewOrgRepository(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+
+	mt.Run("create repository", func(mt *mtest.T) {
+		db := mt.DB
+		repo := NewOrgRepository(db, repoTestLogger())
+		if repo == nil {
+			mt.Fatal("NewOrgRepository returned nil")
+		}
+		if repo.collection == nil {
+			mt.Error("collection is nil")
+		}
+	})
+}
+
+func TestOrg_FindActiveOrgIDs(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+
+	mt.Run("find active org IDs - success", func(mt *mtest.T) {
+		repo := &OrgRepository{
+			collection: mt.Coll,
+			log:        repoTestLogger(),
+		}
+
+		first := mtest.CreateCursorResponse(1, "test.org", mtest.FirstBatch,
+			mustMarshalBSON(mt, orgDoc{OrgID: 1}),
+			mustMarshalBSON(mt, orgDoc{OrgID: 2}),
+		)
+		killCursors := mtest.CreateCursorResponse(0, "test.org", mtest.NextBatch)
+		mt.AddMockResponses(first, killCursors)
+
+		orgIDs, err := repo.FindActiveOrgIDs()
+		if err != nil {
+			mt.Fatalf("unexpected error: %v", err)
+		}
+		if len(orgIDs) != 2 || orgIDs[0] != 1 || orgIDs[1] != 2 {
+			mt.Errorf("orgIDs = %v, want [1 2]", orgIDs)
+		}
+	})
+
+	mt.Run("find active org IDs - empty results", func(mt *mtest.T) {
+		repo := &OrgRepository{
+			collection: mt.Coll,
+			log:        repoTestLogger(),
+		}
+
+		first := mtest.CreateCursorResponse(1, "test.org", mtest.FirstBatch)
+		killCursors := mtest.CreateCursorResponse(0, "test.org", mtest.NextBatch)
+		mt.AddMockResponses(first, killCursors)
+
+		orgIDs, err := repo.FindActiveOrgIDs()
+		if err != nil {
+			mt.Fatalf("unexpected error: %v", err)
+		}
+		if len(orgIDs) != 0 {
+			mt.Errorf("expected 0 org IDs, got %d", len(orgIDs))
+		}
+	})
+}
+
 // mustMarshalBSON marshals a value to BSON and returns the raw bytes.
 func mustMarshalBSON(t testing.TB, v interface{}) bson.D {
 	data, err := bson.Marshal(v)
