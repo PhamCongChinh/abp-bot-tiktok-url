@@ -31,6 +31,9 @@ type Config struct {
 	MongoMinPoolSize int
 	OrgIDs           []int
 
+	// PostgreSQL (org lookup: active org_ids)
+	PGDSN string
+
 	// API
 	APIURL             string
 	HTTPTimeoutSeconds int
@@ -71,6 +74,7 @@ type Config struct {
 //   - MONGO_DB
 //   - BOT_NAME
 //   - GPM_API
+//   - PG_DSN
 //
 // Optional fields have sensible defaults when not set.
 func Load() (Config, error) {
@@ -82,6 +86,7 @@ func Load() (Config, error) {
 	loadGeneralSettings(&cfg, &errs)
 	loadLogSettings(&cfg, &errs)
 	loadMongoSettings(&cfg, &errs)
+	loadPostgresSettings(&cfg, &errs)
 	loadAPISettings(&cfg, &errs)
 	loadGpmSettings(&cfg, &errs)
 	loadCrawlSettings(&cfg, &errs)
@@ -186,6 +191,12 @@ func loadMongoSettings(cfg *Config, errs *[]string) {
 		*errs = append(*errs, orgErr.Error())
 	}
 	cfg.OrgIDs = orgIDs
+}
+
+// loadPostgresSettings populates PostgreSQL configuration fields (used to
+// resolve active org_ids).
+func loadPostgresSettings(cfg *Config, errs *[]string) {
+	cfg.PGDSN = requireStr(errs, "PG_DSN")
 }
 
 // loadAPISettings populates API client configuration fields.

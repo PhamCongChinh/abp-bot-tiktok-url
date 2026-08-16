@@ -4,10 +4,8 @@ import (
 	"context"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.uber.org/zap"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // OrgStore abstracts organisation lookup operations.
@@ -16,47 +14,45 @@ type OrgStore interface {
 	FindActiveOrgIDs() ([]int, error)
 }
 
-// orgDoc is the subset of the `org` collection schema needed to resolve
-// active org_ids.
-type orgDoc struct {
-	OrgID int `bson:"org_id"`
+// pgQuerier is the subset of *pgxpool.Pool used by OrgRepository — satisfied
+// by the real pool in production and by pgxmock in tests.
+type pgQuerier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 }
+
+const findActiveOrgIDsQuery = `SELECT org_id FROM org WHERE status = 'ACTIVE'`
 
 type OrgRepository struct {
-	collection *mongo.Collection
-	log        *zap.Logger
+	db pgQuerier
 }
 
-func NewOrgRepository(db *mongo.Database, log *zap.Logger) *OrgRepository {
-	return &OrgRepository{
-		collection: db.Collection("org"),
-		log:        log,
-	}
+func NewOrgRepository(pool *pgxpool.Pool) *OrgRepository {
+	return &OrgRepository{db: pool}
 }
 
-// FindActiveOrgIDs returns the org_id of every org document with
-// status="ACTIVE".
+// FindActiveOrgIDs returns the org_id of every row in the `org` table with
+// status = 'ACTIVE'.
 func (r *OrgRepository) FindActiveOrgIDs() ([]int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	filter := bson.M{"status": "ACTIVE"}
-	opts := options.Find().SetProjection(bson.M{"org_id": 1})
-
-	cursor, err := r.collection.Find(ctx, filter, opts)
+	rows, err := r.db.Query(ctx, findActiveOrgIDsQuery)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = cursor.Close(ctx) }()
+	defer rows.Close()
 
-	var docs []orgDoc
-	if err := cursor.All(ctx, &docs); err != nil {
+	var orgIDs []int
+	for rows.Next() {
+		var orgID int
+		if err := rows.Scan(&orgID); err != nil {
+			return nil, err
+		}
+		orgIDs = append(orgIDs, orgID)
+	}
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	orgIDs := make([]int, 0, len(docs))
-	for _, d := range docs {
-		orgIDs = append(orgIDs, d.OrgID)
-	}
 	return orgIDs, nil
 }

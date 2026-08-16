@@ -39,6 +39,7 @@ func TestLoad_AllRequiredFields(t *testing.T) {
 		setEnv(t, "MONGO_DB", "testdb"),
 		setEnv(t, "BOT_NAME", "testbot"),
 		setEnv(t, "GPM_API", "https://gpm.example.com"),
+		setEnv(t, "PG_DSN", "postgres://localhost:5432/testdb"),
 	}
 	defer func() {
 		for _, fn := range cleanups {
@@ -63,6 +64,9 @@ func TestLoad_AllRequiredFields(t *testing.T) {
 	if cfg.GPMAPI != "https://gpm.example.com" {
 		t.Errorf("GPM_API = %q, want %q", cfg.GPMAPI, "https://gpm.example.com")
 	}
+	if cfg.PGDSN != "postgres://localhost:5432/testdb" {
+		t.Errorf("PG_DSN = %q, want %q", cfg.PGDSN, "postgres://localhost:5432/testdb")
+	}
 }
 
 func TestLoad_MissingRequiredField(t *testing.T) {
@@ -75,6 +79,7 @@ func TestLoad_MissingRequiredField(t *testing.T) {
 		{"missing MONGO_DB", "MONGO_DB", "MONGO_DB is required"},
 		{"missing BOT_NAME", "BOT_NAME", "BOT_NAME is required"},
 		{"missing GPM_API", "GPM_API", "GPM_API is required"},
+		{"missing PG_DSN", "PG_DSN", "PG_DSN is required"},
 	}
 
 	for _, tt := range tests {
@@ -85,6 +90,7 @@ func TestLoad_MissingRequiredField(t *testing.T) {
 				setEnv(t, "MONGO_DB", "testdb"),
 				setEnv(t, "BOT_NAME", "testbot"),
 				setEnv(t, "GPM_API", "https://gpm.example.com"),
+				setEnv(t, "PG_DSN", "postgres://localhost:5432/testdb"),
 			}
 			defer func() {
 				for _, fn := range cleanups {
@@ -135,6 +141,7 @@ func TestLoad_Defaults(t *testing.T) {
 		setEnv(t, "MONGO_DB", "testdb"),
 		setEnv(t, "BOT_NAME", "testbot"),
 		setEnv(t, "GPM_API", "https://gpm.example.com"),
+		setEnv(t, "PG_DSN", "postgres://localhost:5432/testdb"),
 	}
 	defer func() {
 		for _, fn := range cleanups {
@@ -196,6 +203,7 @@ func TestLoad_CustomValues(t *testing.T) {
 		setEnv(t, "MONGO_DB", "customdb"),
 		setEnv(t, "BOT_NAME", "custombot"),
 		setEnv(t, "GPM_API", "https://custom.gpm.example.com"),
+		setEnv(t, "PG_DSN", "postgres://custom:5432/customdb"),
 		setEnv(t, "LOG_LEVEL", "debug"),
 		setEnv(t, "DEBUG", "true"),
 		setEnv(t, "OUTPUT_DIR", "/custom/output"),
@@ -238,6 +246,7 @@ func TestLoad_CustomValues(t *testing.T) {
 		{"MongoDB", cfg.MongoDB, "customdb"},
 		{"BotName", cfg.BotName, "custombot"},
 		{"GPMAPI", cfg.GPMAPI, "https://custom.gpm.example.com"},
+		{"PGDSN", cfg.PGDSN, "postgres://custom:5432/customdb"},
 		{"LogLevel", cfg.LogLevel, "debug"},
 		{"Debug", cfg.Debug, true},
 		{"OutputDir", cfg.OutputDir, "/custom/output"},
@@ -445,6 +454,7 @@ func TestLoad_EmptyOptionalStringUsesDefault(t *testing.T) {
 		setEnv(t, "MONGO_DB", "testdb"),
 		setEnv(t, "BOT_NAME", "testbot"),
 		setEnv(t, "GPM_API", "https://gpm.example.com"),
+		setEnv(t, "PG_DSN", "postgres://localhost:5432/testdb"),
 		setEnv(t, "LOG_LEVEL", ""),
 	}
 	defer func() {
@@ -468,6 +478,7 @@ func TestLoad_UseGPMNoProfileIDs(t *testing.T) {
 		setEnv(t, "MONGO_DB", "testdb"),
 		setEnv(t, "BOT_NAME", "testbot"),
 		setEnv(t, "GPM_API", "https://gpm.example.com"),
+		setEnv(t, "PG_DSN", "postgres://localhost:5432/testdb"),
 		// No PROFILE_IDS
 	}
 	defer func() {
@@ -492,6 +503,7 @@ func TestLoad_MultipleErrors(t *testing.T) {
 		unsetEnv(t, "MONGO_DB"),
 		unsetEnv(t, "BOT_NAME"),
 		unsetEnv(t, "GPM_API"),
+		unsetEnv(t, "PG_DSN"),
 	}
 	defer func() {
 		for _, fn := range cleanups {
@@ -515,6 +527,9 @@ func TestLoad_MultipleErrors(t *testing.T) {
 	}
 	if !strings.Contains(errMsg, "GPM_API") {
 		t.Error("error should mention GPM_API")
+	}
+	if !strings.Contains(errMsg, "PG_DSN") {
+		t.Error("error should mention PG_DSN")
 	}
 }
 

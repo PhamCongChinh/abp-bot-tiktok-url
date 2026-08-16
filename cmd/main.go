@@ -61,9 +61,10 @@ func main() {
 		cancel()
 	}()
 
-	// Connect MongoDB. The bot resolves which URLs to crawl dynamically every
-	// cycle: active orgs from the `org` collection (status="ACTIVE"), then
-	// their URLs from `tiktok_url` — see Crawler.loadURLs().
+	// Connect MongoDB (source of `tiktok_url`) and PostgreSQL (source of
+	// active org_ids via the `org` table). The bot resolves which URLs to
+	// crawl dynamically every cycle: active orgs from Postgres, then their
+	// URLs from Mongo's `tiktok_url` collection — see Crawler.loadURLs().
 	dbCtx, dbCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer dbCancel()
 
@@ -74,7 +75,13 @@ func main() {
 	}
 	defer func() { _ = mongoDB.Close() }()
 
-	orgRepo := repository.NewOrgRepository(mongoDB.Database(), log)
+	pgDB, err := database.NewPostgresDB(dbCtx, cfg.PGDSN, log)
+	if err != nil {
+		log.Fatal("Failed to connect PostgreSQL", zap.Error(err))
+	}
+	defer pgDB.Close()
+
+	orgRepo := repository.NewOrgRepository(pgDB.Pool)
 	urlRepo := repository.NewURLRepository(mongoDB.Database(), log)
 
 	// Init Prometheus metrics for observability.

@@ -2,11 +2,14 @@ package repository
 
 import (
 	"context"
+	"fmt"
+	"regexp"
 	"testing"
 	"time"
 
 	"abp-bot-tiktok-url/internal/models"
 
+	"github.com/pashagolub/pgxmock/v3"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
@@ -504,62 +507,65 @@ func TestVideoDocumentModel(t *testing.T) {
 	}
 }
 
-func TestNewOrgRepository(t *testing.T) {
-	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-
-	mt.Run("create repository", func(mt *mtest.T) {
-		db := mt.DB
-		repo := NewOrgRepository(db, repoTestLogger())
-		if repo == nil {
-			mt.Fatal("NewOrgRepository returned nil")
-		}
-		if repo.collection == nil {
-			mt.Error("collection is nil")
-		}
-	})
-}
-
 func TestOrg_FindActiveOrgIDs(t *testing.T) {
-	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-
-	mt.Run("find active org IDs - success", func(mt *mtest.T) {
-		repo := &OrgRepository{
-			collection: mt.Coll,
-			log:        repoTestLogger(),
+	t.Run("success", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		if err != nil {
+			t.Fatalf("failed to create pgxmock pool: %v", err)
 		}
+		defer mock.Close()
 
-		first := mtest.CreateCursorResponse(1, "test.org", mtest.FirstBatch,
-			mustMarshalBSON(mt, orgDoc{OrgID: 1}),
-			mustMarshalBSON(mt, orgDoc{OrgID: 2}),
-		)
-		killCursors := mtest.CreateCursorResponse(0, "test.org", mtest.NextBatch)
-		mt.AddMockResponses(first, killCursors)
+		repo := &OrgRepository{db: mock}
+
+		rows := pgxmock.NewRows([]string{"org_id"}).AddRow(1).AddRow(2)
+		mock.ExpectQuery(regexp.QuoteMeta(findActiveOrgIDsQuery)).WillReturnRows(rows)
 
 		orgIDs, err := repo.FindActiveOrgIDs()
 		if err != nil {
-			mt.Fatalf("unexpected error: %v", err)
+			t.Fatalf("unexpected error: %v", err)
 		}
 		if len(orgIDs) != 2 || orgIDs[0] != 1 || orgIDs[1] != 2 {
-			mt.Errorf("orgIDs = %v, want [1 2]", orgIDs)
+			t.Errorf("orgIDs = %v, want [1 2]", orgIDs)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("unmet expectations: %v", err)
 		}
 	})
 
-	mt.Run("find active org IDs - empty results", func(mt *mtest.T) {
-		repo := &OrgRepository{
-			collection: mt.Coll,
-			log:        repoTestLogger(),
+	t.Run("empty results", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		if err != nil {
+			t.Fatalf("failed to create pgxmock pool: %v", err)
 		}
+		defer mock.Close()
 
-		first := mtest.CreateCursorResponse(1, "test.org", mtest.FirstBatch)
-		killCursors := mtest.CreateCursorResponse(0, "test.org", mtest.NextBatch)
-		mt.AddMockResponses(first, killCursors)
+		repo := &OrgRepository{db: mock}
+
+		rows := pgxmock.NewRows([]string{"org_id"})
+		mock.ExpectQuery(regexp.QuoteMeta(findActiveOrgIDsQuery)).WillReturnRows(rows)
 
 		orgIDs, err := repo.FindActiveOrgIDs()
 		if err != nil {
-			mt.Fatalf("unexpected error: %v", err)
+			t.Fatalf("unexpected error: %v", err)
 		}
 		if len(orgIDs) != 0 {
-			mt.Errorf("expected 0 org IDs, got %d", len(orgIDs))
+			t.Errorf("expected 0 org IDs, got %d", len(orgIDs))
+		}
+	})
+
+	t.Run("query error", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		if err != nil {
+			t.Fatalf("failed to create pgxmock pool: %v", err)
+		}
+		defer mock.Close()
+
+		repo := &OrgRepository{db: mock}
+
+		mock.ExpectQuery(regexp.QuoteMeta(findActiveOrgIDsQuery)).WillReturnError(fmt.Errorf("connection reset"))
+
+		if _, err := repo.FindActiveOrgIDs(); err == nil {
+			t.Fatal("expected error, got nil")
 		}
 	})
 }
