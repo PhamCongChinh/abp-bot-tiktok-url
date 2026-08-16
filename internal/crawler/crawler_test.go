@@ -12,12 +12,12 @@ import (
 
 // fakeOrgStore is a test double for repository.OrgStore.
 type fakeOrgStore struct {
-	orgIDs []int
-	err    error
+	orgs []repository.Org
+	err  error
 }
 
-func (f *fakeOrgStore) FindActiveOrgIDs() ([]int, error) {
-	return f.orgIDs, f.err
+func (f *fakeOrgStore) FindActiveOrgs() ([]repository.Org, error) {
+	return f.orgs, f.err
 }
 
 // fakeURLStore is a test double for repository.URLStore.
@@ -59,7 +59,7 @@ func TestLoadURLs_QueriesMongoWhenWired(t *testing.T) {
 	c := &Crawler{
 		cfg: &config.Config{},
 		log: zap.NewNop(),
-		orgRepo: &fakeOrgStore{orgIDs: []int{1, 2}},
+		orgRepo: &fakeOrgStore{orgs: []repository.Org{{OrgID: 1, Name: "Org One"}, {OrgID: 2, Name: "Org Two"}}},
 		urlRepo: &fakeURLStore{entries: []repository.URLEntry{
 			{URL: "https://www.tiktok.com/@user1", OrgID: 1, Active: true},
 			{URL: "https://www.tiktok.com/@user2", OrgID: 2, Active: false},
@@ -82,7 +82,7 @@ func TestLoadURLs_NoActiveOrgs(t *testing.T) {
 	c := &Crawler{
 		cfg:     &config.Config{},
 		log:     zap.NewNop(),
-		orgRepo: &fakeOrgStore{orgIDs: nil},
+		orgRepo: &fakeOrgStore{orgs: nil},
 		urlRepo: &fakeURLStore{},
 	}
 

@@ -11,7 +11,13 @@ import (
 // OrgStore abstracts organisation lookup operations.
 // Define at consumer side so Crawler depends on this, not on *OrgRepository.
 type OrgStore interface {
-	FindActiveOrgIDs() ([]int, error)
+	FindActiveOrgs() ([]Org, error)
+}
+
+// Org is an active organisation resolved from `tbl_org`.
+type Org struct {
+	OrgID int
+	Name  string
 }
 
 // pgQuerier is the subset of *pgxpool.Pool used by OrgRepository — satisfied
@@ -30,9 +36,8 @@ func NewOrgRepository(pool *pgxpool.Pool) *OrgRepository {
 	return &OrgRepository{db: pool}
 }
 
-// FindActiveOrgIDs returns the org_id of every row in `tbl_org` with
-// status = 'ACTIVE'.
-func (r *OrgRepository) FindActiveOrgIDs() ([]int, error) {
+// FindActiveOrgs returns every row in `tbl_org` with status = 'ACTIVE'.
+func (r *OrgRepository) FindActiveOrgs() ([]Org, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -42,18 +47,17 @@ func (r *OrgRepository) FindActiveOrgIDs() ([]int, error) {
 	}
 	defer rows.Close()
 
-	var orgIDs []int
+	var orgs []Org
 	for rows.Next() {
-		var orgID int
-		var name string
-		if err := rows.Scan(&orgID, &name); err != nil {
+		var o Org
+		if err := rows.Scan(&o.OrgID, &o.Name); err != nil {
 			return nil, err
 		}
-		orgIDs = append(orgIDs, orgID)
+		orgs = append(orgs, o)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	return orgIDs, nil
+	return orgs, nil
 }

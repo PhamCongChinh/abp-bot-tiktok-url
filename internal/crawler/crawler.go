@@ -139,13 +139,19 @@ func (c *Crawler) loadURLs() ([]string, map[string]int, error) {
 		return urls, c.cfg.URLOrgMap, nil
 	}
 
-	orgIDs, err := c.orgRepo.FindActiveOrgIDs()
+	orgs, err := c.orgRepo.FindActiveOrgs()
 	if err != nil {
-		return nil, nil, fmt.Errorf("loadURLs: FindActiveOrgIDs: %w", err)
+		return nil, nil, fmt.Errorf("loadURLs: FindActiveOrgs: %w", err)
 	}
-	if len(orgIDs) == 0 {
+	if len(orgs) == 0 {
 		c.log.Warn("loadURLs: no active orgs found in `tbl_org` (status=ACTIVE)")
 		return nil, nil, nil
+	}
+
+	orgIDs := make([]int, len(orgs))
+	for i, o := range orgs {
+		orgIDs[i] = o.OrgID
+		c.log.Info("loadURLs: active org", zap.Int("org_id", o.OrgID), zap.String("name", o.Name))
 	}
 
 	urlEntries, err := c.urlRepo.FindByOrgIDs(orgIDs)

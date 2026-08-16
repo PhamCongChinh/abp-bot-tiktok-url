@@ -507,7 +507,7 @@ func TestVideoDocumentModel(t *testing.T) {
 	}
 }
 
-func TestOrg_FindActiveOrgIDs(t *testing.T) {
+func TestOrg_FindActiveOrgs(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mock, err := pgxmock.NewPool()
 		if err != nil {
@@ -520,12 +520,12 @@ func TestOrg_FindActiveOrgIDs(t *testing.T) {
 		rows := pgxmock.NewRows([]string{"org_id", "name"}).AddRow(1, "Org One").AddRow(2, "Org Two")
 		mock.ExpectQuery(regexp.QuoteMeta(findActiveOrgIDsQuery)).WillReturnRows(rows)
 
-		orgIDs, err := repo.FindActiveOrgIDs()
+		orgs, err := repo.FindActiveOrgs()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if len(orgIDs) != 2 || orgIDs[0] != 1 || orgIDs[1] != 2 {
-			t.Errorf("orgIDs = %v, want [1 2]", orgIDs)
+		if len(orgs) != 2 || orgs[0].OrgID != 1 || orgs[0].Name != "Org One" || orgs[1].OrgID != 2 || orgs[1].Name != "Org Two" {
+			t.Errorf("orgs = %+v, want [{1 Org One} {2 Org Two}]", orgs)
 		}
 		if err := mock.ExpectationsWereMet(); err != nil {
 			t.Errorf("unmet expectations: %v", err)
@@ -544,12 +544,12 @@ func TestOrg_FindActiveOrgIDs(t *testing.T) {
 		rows := pgxmock.NewRows([]string{"org_id", "name"})
 		mock.ExpectQuery(regexp.QuoteMeta(findActiveOrgIDsQuery)).WillReturnRows(rows)
 
-		orgIDs, err := repo.FindActiveOrgIDs()
+		orgs, err := repo.FindActiveOrgs()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if len(orgIDs) != 0 {
-			t.Errorf("expected 0 org IDs, got %d", len(orgIDs))
+		if len(orgs) != 0 {
+			t.Errorf("expected 0 orgs, got %d", len(orgs))
 		}
 	})
 
@@ -564,7 +564,7 @@ func TestOrg_FindActiveOrgIDs(t *testing.T) {
 
 		mock.ExpectQuery(regexp.QuoteMeta(findActiveOrgIDsQuery)).WillReturnError(fmt.Errorf("connection reset"))
 
-		if _, err := repo.FindActiveOrgIDs(); err == nil {
+		if _, err := repo.FindActiveOrgs(); err == nil {
 			t.Fatal("expected error, got nil")
 		}
 	})
