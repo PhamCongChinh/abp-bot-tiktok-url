@@ -104,7 +104,7 @@ cp .env.example .env
 | `BOT_NAME` | Tên bot instance (dùng trong bot_config Mongo) |
 | `MONGO_URI` | Connection string MongoDB (nguồn URL crawl — collection `tiktok_url`) |
 | `MONGO_DB` | Tên database Mongo |
-| `PG_DSN` | Connection string PostgreSQL, vd `postgres://user:pass@localhost:5432/dbname?sslmode=disable` (nguồn org active — bảng `org`) |
+| `PG_DSN` | Connection string PostgreSQL, vd `postgres://user:pass@localhost:5432/dbname?sslmode=disable` (nguồn org active — bảng `tbl_org`) |
 | `GPM_API` | URL base của GPM API, vd `http://localhost:50325/api/v1` |
 
 > `ORG_IDS` không còn được dùng để lọc org nữa — danh sách org_id active giờ lấy động từ PostgreSQL mỗi chu kỳ crawl (xem mục "Luồng hoạt động" bên dưới).
@@ -256,16 +256,17 @@ Bot sẽ tự động dùng local Chrome (`UseGPM=false` khi `PROFILE_IDS` rỗn
 
 ## PostgreSQL Tables
 
-### `org` (danh sách tổ chức được crawl)
+### `tbl_org` (danh sách tổ chức được crawl)
 
 ```sql
-CREATE TABLE org (
+CREATE TABLE tbl_org (
   org_id INT PRIMARY KEY,
+  name   TEXT,
   status TEXT NOT NULL   -- chỉ org có status = 'ACTIVE' mới được crawl
 );
 ```
 
-Được truy vấn lại mỗi chu kỳ crawl (`internal/repository/org_repo.go` → `FindActiveOrgIDs()`, query `SELECT org_id FROM org WHERE status = 'ACTIVE'`) để lấy danh sách `org_id` hiện đang active, dùng làm filter khi lấy URL từ `tiktok_url` bên dưới (MongoDB).
+Được truy vấn lại mỗi chu kỳ crawl (`internal/repository/org_repo.go` → `FindActiveOrgIDs()`, query `SELECT t.org_id, t.name FROM tbl_org t WHERE t.status = 'ACTIVE'`) để lấy danh sách `org_id` hiện đang active, dùng làm filter khi lấy URL từ `tiktok_url` bên dưới (MongoDB).
 
 ## MongoDB Collections
 
@@ -361,13 +362,13 @@ go run github.com/playwright-community/playwright-go/cmd/playwright@v0.5700.1 in
 
 → Kiểm tra `PROFILE_IDS` đúng chưa. Không dùng giá trị placeholder mẫu.
 
-### Log: "no active orgs found in `org` collection (status=ACTIVE)" / "no active URLs to crawl this cycle, skipping"
+### Log: "no active orgs found in `tbl_org` (status=ACTIVE)" / "no active URLs to crawl this cycle, skipping"
 
 → Bot không lỗi (không crash) nhưng bỏ qua chu kỳ crawl đó. Kiểm tra:
 
 ```sql
 -- PostgreSQL
-SELECT org_id FROM org WHERE status = 'ACTIVE';
+SELECT t.org_id, t.name FROM tbl_org t WHERE t.status = 'ACTIVE';
 ```
 
 ```javascript

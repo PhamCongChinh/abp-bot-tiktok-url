@@ -20,7 +20,7 @@ type pgQuerier interface {
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 }
 
-const findActiveOrgIDsQuery = `SELECT org_id FROM org WHERE status = 'ACTIVE'`
+const findActiveOrgIDsQuery = `SELECT t.org_id, t.name FROM tbl_org t WHERE t.status = 'ACTIVE'`
 
 type OrgRepository struct {
 	db pgQuerier
@@ -30,7 +30,7 @@ func NewOrgRepository(pool *pgxpool.Pool) *OrgRepository {
 	return &OrgRepository{db: pool}
 }
 
-// FindActiveOrgIDs returns the org_id of every row in the `org` table with
+// FindActiveOrgIDs returns the org_id of every row in `tbl_org` with
 // status = 'ACTIVE'.
 func (r *OrgRepository) FindActiveOrgIDs() ([]int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -45,7 +45,8 @@ func (r *OrgRepository) FindActiveOrgIDs() ([]int, error) {
 	var orgIDs []int
 	for rows.Next() {
 		var orgID int
-		if err := rows.Scan(&orgID); err != nil {
+		var name string
+		if err := rows.Scan(&orgID, &name); err != nil {
 			return nil, err
 		}
 		orgIDs = append(orgIDs, orgID)

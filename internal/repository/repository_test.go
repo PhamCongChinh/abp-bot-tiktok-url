@@ -517,7 +517,7 @@ func TestOrg_FindActiveOrgIDs(t *testing.T) {
 
 		repo := &OrgRepository{db: mock}
 
-		rows := pgxmock.NewRows([]string{"org_id"}).AddRow(1).AddRow(2)
+		rows := pgxmock.NewRows([]string{"org_id", "name"}).AddRow(1, "Org One").AddRow(2, "Org Two")
 		mock.ExpectQuery(regexp.QuoteMeta(findActiveOrgIDsQuery)).WillReturnRows(rows)
 
 		orgIDs, err := repo.FindActiveOrgIDs()
@@ -541,7 +541,7 @@ func TestOrg_FindActiveOrgIDs(t *testing.T) {
 
 		repo := &OrgRepository{db: mock}
 
-		rows := pgxmock.NewRows([]string{"org_id"})
+		rows := pgxmock.NewRows([]string{"org_id", "name"})
 		mock.ExpectQuery(regexp.QuoteMeta(findActiveOrgIDsQuery)).WillReturnRows(rows)
 
 		orgIDs, err := repo.FindActiveOrgIDs()

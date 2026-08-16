@@ -144,7 +144,7 @@ func (c *Crawler) loadURLs() ([]string, map[string]int, error) {
 		return nil, nil, fmt.Errorf("loadURLs: FindActiveOrgIDs: %w", err)
 	}
 	if len(orgIDs) == 0 {
-		c.log.Warn("loadURLs: no active orgs found in `org` collection (status=ACTIVE)")
+		c.log.Warn("loadURLs: no active orgs found in `tbl_org` (status=ACTIVE)")
 		return nil, nil, nil
 	}
 
