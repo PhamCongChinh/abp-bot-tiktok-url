@@ -133,10 +133,10 @@ cp .env.example .env
 
 # URLS=https://www.tiktok.com/@someuser,https://www.tiktok.com/@otheruser/video/7123456789012345678
 
-# SLEEP_MIN_URL=60            # nghỉ giữa các URL (giây)
-# SLEEP_MAX_URL=180
-# REST_MIN_SESSION=180        # nghỉ giữa các phiên crawl đầy đủ (giây)
-# REST_MAX_SESSION=300
+# SLEEP_MIN_URL=60            # nghỉ giữa các URL (giây), mặc định 1-2 phút
+# SLEEP_MAX_URL=120
+# REST_MIN_SESSION=120        # nghỉ giữa các batch (giây), mặc định 2-3 phút
+# REST_MAX_SESSION=180
 
 # BATCH_MIN=3                  # số URL xử lý theo batch
 # BATCH_MAX=5
@@ -341,8 +341,8 @@ Video crawl được **không** ghi trực tiếp vào MongoDB trong luồng hi�
 
 Code đã có:
 
-- Random sleep giữa URL (`SLEEP_MIN_URL`–`SLEEP_MAX_URL`, mặc định 60-180s)
-- Random rest giữa session (`REST_MIN_SESSION`–`REST_MAX_SESSION`, mặc định 180-300s)
+- Random sleep giữa URL (`SLEEP_MIN_URL`–`SLEEP_MAX_URL`, mặc định 60-120s = 1-2 phút)
+- Random rest giữa batch (`REST_MIN_SESSION`–`REST_MAX_SESSION`, mặc định 120-180s = 2-3 phút)
 - Human scroll simulation, random mouse movement, random video viewing (trang profile)
 - Phát hiện rate-limit/captcha (mã 2061, 10000, -1) → tạm dừng 5 phút
 - Giới hạn video/URL và số trang/session (`MAX_VIDEOS_PER_URL`, `MAX_PAGES_PER_SESSION`)

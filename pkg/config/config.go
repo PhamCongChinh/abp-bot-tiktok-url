@@ -221,9 +221,9 @@ func loadCrawlSettings(cfg *Config, errs *[]string) {
 	}
 
 	cfg.SleepMinURL = optInt(errs, "SLEEP_MIN_URL", 60)
-	cfg.SleepMaxURL = optInt(errs, "SLEEP_MAX_URL", 180)
-	cfg.RestMinSession = optInt(errs, "REST_MIN_SESSION", 180)
-	cfg.RestMaxSession = optInt(errs, "REST_MAX_SESSION", 300)
+	cfg.SleepMaxURL = optInt(errs, "SLEEP_MAX_URL", 120)
+	cfg.RestMinSession = optInt(errs, "REST_MIN_SESSION", 120)
+	cfg.RestMaxSession = optInt(errs, "REST_MAX_SESSION", 180)
 
 	cfg.BatchMin = optInt(errs, "BATCH_MIN", 3)
 	cfg.BatchMax = optInt(errs, "BATCH_MAX", 5)
