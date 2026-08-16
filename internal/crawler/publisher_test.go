@@ -209,13 +209,13 @@ func TestPublisher_ParseVideos_EmptyItems(t *testing.T) {
 	p, _, _ := testPublisher(t)
 
 	// Nil items.
-	result := p.ParseVideos("kw", 1, nil)
+	result := p.ParseVideos("kw", 1, "own", nil)
 	if len(result) != 0 {
 		t.Errorf("expected 0 results from nil items, got %d", len(result))
 	}
 
 	// Empty items.
-	result = p.ParseVideos("kw", 1, []map[string]any{})
+	result = p.ParseVideos("kw", 1, "own", []map[string]any{})
 	if len(result) != 0 {
 		t.Errorf("expected 0 results from empty items, got %d", len(result))
 	}
@@ -245,7 +245,7 @@ func TestPublisher_ParseVideos_ValidItem(t *testing.T) {
 		},
 	}
 
-	result := p.ParseVideos("https://www.tiktok.com/@testuser", 42, items)
+	result := p.ParseVideos("https://www.tiktok.com/@testuser", 42, "nature", items)
 	if len(result) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(result))
 	}
@@ -256,6 +256,9 @@ func TestPublisher_ParseVideos_ValidItem(t *testing.T) {
 	}
 	if v.OrgID != 42 {
 		t.Errorf("OrgID = %d, want 42", v.OrgID)
+	}
+	if v.SourceOwnership != "nature" {
+		t.Errorf("SourceOwnership = %q, want %q", v.SourceOwnership, "nature")
 	}
 	if v.VideoID != "123456789" {
 		t.Errorf("VideoID = %q, want %q", v.VideoID, "123456789")
@@ -307,7 +310,7 @@ func TestPublisher_ParseVideos_StaleItem(t *testing.T) {
 		},
 	}
 
-	result := p.ParseVideos("kw", 1, items)
+	result := p.ParseVideos("kw", 1, "own", items)
 	if len(result) != 0 {
 		t.Errorf("expected 0 results from stale item, got %d", len(result))
 	}
@@ -325,7 +328,7 @@ func TestPublisher_ParseVideos_EmptyVideoID(t *testing.T) {
 		},
 	}
 
-	result := p.ParseVideos("kw", 1, items)
+	result := p.ParseVideos("kw", 1, "own", items)
 	if len(result) != 0 {
 		t.Errorf("expected 0 results for empty video ID, got %d", len(result))
 	}
@@ -356,7 +359,7 @@ func TestPublisher_ParseVideos_MixedItems(t *testing.T) {
 		},
 	}
 
-	result := p.ParseVideos("kw", 1, items)
+	result := p.ParseVideos("kw", 1, "own", items)
 	if len(result) != 2 {
 		t.Errorf("expected 2 valid results, got %d", len(result))
 	}

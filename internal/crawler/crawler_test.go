@@ -43,7 +43,7 @@ func TestLoadURLs_FallsBackToStaticConfig(t *testing.T) {
 		log: zap.NewNop(),
 	}
 
-	urls, urlOrgMap, err := c.loadURLs()
+	urls, urlOrgMap, _, err := c.loadURLs()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -61,12 +61,12 @@ func TestLoadURLs_QueriesMongoWhenWired(t *testing.T) {
 		log: zap.NewNop(),
 		orgRepo: &fakeOrgStore{orgs: []repository.Org{{OrgID: 1, Name: "Org One"}, {OrgID: 2, Name: "Org Two"}}},
 		urlRepo: &fakeURLStore{entries: []repository.URLEntry{
-			{URL: "https://www.tiktok.com/@user1", ProjectID: []int{1}, Source: "tiktok"},
-			{URL: "https://www.tiktok.com/@user2", ProjectID: []int{99}, Source: "tiktok"},
+			{URL: "https://www.tiktok.com/@user1", ProjectID: []int{1}, Source: "tiktok", SourceOwnership: "nature"},
+			{URL: "https://www.tiktok.com/@user2", ProjectID: []int{99}, Source: "tiktok", SourceOwnership: "own"},
 		}},
 	}
 
-	urls, urlOrgMap, err := c.loadURLs()
+	urls, urlOrgMap, urlSourceOwnershipMap, err := c.loadURLs()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,6 +75,9 @@ func TestLoadURLs_QueriesMongoWhenWired(t *testing.T) {
 	}
 	if urlOrgMap["https://www.tiktok.com/@user1"] != 1 {
 		t.Errorf("urlOrgMap[user1] = %d, want 1", urlOrgMap["https://www.tiktok.com/@user1"])
+	}
+	if urlSourceOwnershipMap["https://www.tiktok.com/@user1"] != "nature" {
+		t.Errorf("urlSourceOwnershipMap[user1] = %q, want %q", urlSourceOwnershipMap["https://www.tiktok.com/@user1"], "nature")
 	}
 }
 
@@ -86,7 +89,7 @@ func TestLoadURLs_NoActiveOrgs(t *testing.T) {
 		urlRepo: &fakeURLStore{},
 	}
 
-	urls, _, err := c.loadURLs()
+	urls, _, _, err := c.loadURLs()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -103,7 +106,7 @@ func TestLoadURLs_PropagatesOrgRepoError(t *testing.T) {
 		urlRepo: &fakeURLStore{},
 	}
 
-	_, _, err := c.loadURLs()
+	_, _, _, err := c.loadURLs()
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

@@ -44,8 +44,9 @@ type Config struct {
 	UseGPM     bool
 
 	// URLs (can be populated from env or MongoDB at runtime)
-	URLs      []string
-	URLOrgMap map[string]int
+	URLs                  []string
+	URLOrgMap             map[string]int
+	URLSourceOwnershipMap map[string]string
 
 	// Crawl timing (seconds)
 	SleepMinURL    int

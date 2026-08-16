@@ -57,11 +57,16 @@ func FromVideoItem(v models.VideoItem) TiktokPost {
 	videoURL := buildVideoURL(v.UniqueID, v.VideoID)
 	authorURL := buildAuthorURL(v.UniqueID)
 
+	sourceOwnership := v.SourceOwnership
+	if sourceOwnership == "" {
+		sourceOwnership = "nature"
+	}
+
 	return TiktokPost{
 		DocType:         docType,
 		CrawlSource:     crawlSource,
 		CrawlSourceCode: crawlSourceCode,
-		OrgID:           18576, //v.OrgID,
+		OrgID:           v.OrgID,
 		PubTime:         v.PubTime,
 		CrawlTime:       time.Now().Unix(),
 		SubjectID:       v.VideoID,
@@ -90,7 +95,7 @@ func FromVideoItem(v models.VideoItem) TiktokPost {
 		Sentiment:       0,
 		IsPriority:      true,
 		CrawlBot:        crawlBot,
-		SourceOwnership: "own",
+		SourceOwnership: sourceOwnership,
 	}
 }
 

@@ -56,7 +56,9 @@ func NewPublisher(apiClient api.APIClient, log *zap.Logger, metrics *CrawlerMetr
 
 // ParseVideos parses raw TikTok API response items into VideoItem models,
 // filtering by cutoff time and skipping items with empty video IDs.
-func (p *Publisher) ParseVideos(sourceURL string, orgID int, items []map[string]any) []models.VideoItem {
+// sourceOwnership comes from the matching `source_crawl` document's
+// source_ownership field (e.g. "own", "nature").
+func (p *Publisher) ParseVideos(sourceURL string, orgID int, sourceOwnership string, items []map[string]any) []models.VideoItem {
 	nowTs := time.Now().Unix()
 	cutoff := nowTs - cutoffSpan
 	var results []models.VideoItem
@@ -76,19 +78,20 @@ func (p *Publisher) ParseVideos(sourceURL string, orgID int, items []map[string]
 		stats, _ := item["stats"].(map[string]any)
 
 		results = append(results, models.VideoItem{
-			SourceURL:   sourceURL,
-			OrgID:       orgID,
-			VideoID:     videoID,
-			Description: toString(item["desc"]),
-			PubTime:     pubTime,
-			UniqueID:    toString(mapGet(author, "uniqueId")),
-			AuthID:      toString(mapGet(author, "id")),
-			AuthName:    toString(mapGet(author, "nickname")),
-			Comments:    int64(toFloat(mapGet(stats, "commentCount"))),
-			Shares:      int64(toFloat(mapGet(stats, "shareCount"))),
-			Reactions:   int64(toFloat(mapGet(stats, "diggCount"))),
-			Favors:      int64(toFloat(mapGet(stats, "collectCount"))),
-			Views:       int64(toFloat(mapGet(stats, "playCount"))),
+			SourceURL:       sourceURL,
+			OrgID:           orgID,
+			VideoID:         videoID,
+			Description:     toString(item["desc"]),
+			PubTime:         pubTime,
+			UniqueID:        toString(mapGet(author, "uniqueId")),
+			AuthID:          toString(mapGet(author, "id")),
+			AuthName:        toString(mapGet(author, "nickname")),
+			Comments:        int64(toFloat(mapGet(stats, "commentCount"))),
+			Shares:          int64(toFloat(mapGet(stats, "shareCount"))),
+			Reactions:       int64(toFloat(mapGet(stats, "diggCount"))),
+			Favors:          int64(toFloat(mapGet(stats, "collectCount"))),
+			Views:           int64(toFloat(mapGet(stats, "playCount"))),
+			SourceOwnership: sourceOwnership,
 		})
 	}
 	return results

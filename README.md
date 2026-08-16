@@ -291,6 +291,8 @@ Collection dùng chung cho nhiều nguồn crawl khác (`source: "youtube"`, `"f
 
 Query thực tế (`internal/repository/url_repo.go` → `FindByOrgIDs()`): `{projectId: {$in: activeOrgIDs}, source: "tiktok"}`. Vì `projectId` là mảng, một URL có thể thuộc nhiều org — bot gán URL đó về org_id đầu tiên khớp với danh sách org đang active để đính kèm vào payload đẩy lên backend API.
 
+Field `source_ownership` của document này cũng được truyền thẳng vào `TiktokPost.source_ownership` khi đẩy video crawl được lên backend API (xem [`internal/parser/tiktok_post.go`](internal/parser/tiktok_post.go)) — nếu field này rỗng/không có, mặc định là `"nature"`.
+
 `url` có thể là:
 - **Video**: `https://www.tiktok.com/@username/video/<id>` — crawl đúng 1 video đó.
 - **Profile**: `https://www.tiktok.com/@username` — crawl các video mới nhất trên trang profile (theo `MAX_VIDEOS_PER_URL`).

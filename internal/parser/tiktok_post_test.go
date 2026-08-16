@@ -10,19 +10,20 @@ import (
 func TestFromVideoItem_Valid(t *testing.T) {
 	before := time.Now().Unix()
 	v := models.VideoItem{
-		SourceURL:   "https://www.tiktok.com/@testuser/video/abc123",
-		OrgID:       42,
-		VideoID:     "abc123",
-		Description: "A test video description",
-		PubTime:     1700000000,
-		UniqueID:    "testuser",
-		AuthID:      "auth-001",
-		AuthName:    "Test User",
-		Comments:    100,
-		Shares:      200,
-		Reactions:   300,
-		Favors:      50,
-		Views:       10000,
+		SourceURL:       "https://www.tiktok.com/@testuser/video/abc123",
+		OrgID:           42,
+		VideoID:         "abc123",
+		Description:     "A test video description",
+		PubTime:         1700000000,
+		UniqueID:        "testuser",
+		AuthID:          "auth-001",
+		AuthName:        "Test User",
+		Comments:        100,
+		Shares:          200,
+		Reactions:       300,
+		Favors:          50,
+		Views:           10000,
+		SourceOwnership: "nature",
 	}
 	post := FromVideoItem(v)
 	after := time.Now().Unix()

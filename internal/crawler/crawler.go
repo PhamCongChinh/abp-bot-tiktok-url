@@ -82,7 +82,7 @@ func (c *Crawler) Run(ctx context.Context) {
 		return
 	}
 
-	urls, urlOrgMap, err := c.loadURLs()
+	urls, urlOrgMap, urlSourceOwnershipMap, err := c.loadURLs()
 	if err != nil {
 		c.log.Error("Crawler.Run: failed to load URLs", zap.Error(err))
 		return
@@ -92,6 +92,7 @@ func (c *Crawler) Run(ctx context.Context) {
 		return
 	}
 	c.cfg.URLOrgMap = urlOrgMap
+	c.cfg.URLSourceOwnershipMap = urlSourceOwnershipMap
 	c.logURLsByOrg(urls, urlOrgMap)
 
 	c.log.Info("Crawler.Run: pausing before opening browser", zap.Duration("pause", preBrowserPause))
@@ -147,20 +148,20 @@ launch:
 // disabling an org takes effect on the next crawl cycle without a bot
 // restart. Otherwise it falls back to the static cfg.URLs/cfg.URLOrgMap
 // loaded from the URLS env var (local runs, tests).
-func (c *Crawler) loadURLs() ([]string, map[string]int, error) {
+func (c *Crawler) loadURLs() ([]string, map[string]int, map[string]string, error) {
 	if c.orgRepo == nil || c.urlRepo == nil {
 		urls := make([]string, len(c.cfg.URLs))
 		copy(urls, c.cfg.URLs)
-		return urls, c.cfg.URLOrgMap, nil
+		return urls, c.cfg.URLOrgMap, c.cfg.URLSourceOwnershipMap, nil
 	}
 
 	orgs, err := c.orgRepo.FindActiveOrgs()
 	if err != nil {
-		return nil, nil, fmt.Errorf("loadURLs: FindActiveOrgs: %w", err)
+		return nil, nil, nil, fmt.Errorf("loadURLs: FindActiveOrgs: %w", err)
 	}
 	if len(orgs) == 0 {
 		c.log.Warn("loadURLs: no active orgs found in `tbl_org` (status=ACTIVE)")
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
 	orgIDs := make([]int, len(orgs))
@@ -171,7 +172,7 @@ func (c *Crawler) loadURLs() ([]string, map[string]int, error) {
 
 	urlEntries, err := c.urlRepo.FindByOrgIDs(orgIDs)
 	if err != nil {
-		return nil, nil, fmt.Errorf("loadURLs: FindByOrgIDs: %w", err)
+		return nil, nil, nil, fmt.Errorf("loadURLs: FindByOrgIDs: %w", err)
 	}
 
 	activeOrgSet := make(map[int]bool, len(orgIDs))
@@ -181,6 +182,7 @@ func (c *Crawler) loadURLs() ([]string, map[string]int, error) {
 
 	urls := make([]string, 0, len(urlEntries))
 	urlOrgMap := make(map[string]int, len(urlEntries))
+	urlSourceOwnershipMap := make(map[string]string, len(urlEntries))
 	for _, u := range urlEntries {
 		// projectId is an array — attribute the URL to whichever active
 		// org_id it belongs to (a URL doc may list multiple projects).
@@ -199,6 +201,7 @@ func (c *Crawler) loadURLs() ([]string, map[string]int, error) {
 		}
 		urls = append(urls, u.URL)
 		urlOrgMap[u.URL] = matchedOrgID
+		urlSourceOwnershipMap[u.URL] = u.SourceOwnership
 	}
 
 	c.log.Info("loadURLs: loaded active URLs from MongoDB",
@@ -206,7 +209,7 @@ func (c *Crawler) loadURLs() ([]string, map[string]int, error) {
 		zap.Int("active_url_count", len(urls)),
 	)
 
-	return urls, urlOrgMap, nil
+	return urls, urlOrgMap, urlSourceOwnershipMap, nil
 }
 
 // logURLsByOrg groups urls by their org_id (via urlOrgMap) and logs each

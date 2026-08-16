@@ -65,7 +65,7 @@ func TestParseVideos_EmptyVideoID(t *testing.T) {
 		},
 	}
 
-	results := p.ParseVideos("https://www.tiktok.com/@testuser", 1, items)
+	results := p.ParseVideos("https://www.tiktok.com/@testuser", 1, "own", items)
 
 	// The item with empty video ID should be skipped; only valid-id-123 should remain.
 	if len(results) != 1 {
@@ -84,7 +84,7 @@ func TestParseVideos_AllEmptyVideoIDs(t *testing.T) {
 		{"id": "", "desc": "b", "createTime": float64(4102444800)},
 	}
 
-	results := p.ParseVideos("https://www.tiktok.com/@testuser", 1, items)
+	results := p.ParseVideos("https://www.tiktok.com/@testuser", 1, "own", items)
 	if len(results) != 0 {
 		t.Fatalf("expected 0 results, got %d", len(results))
 	}
@@ -106,7 +106,7 @@ func TestParseVideos_CutoffFilter(t *testing.T) {
 		},
 	}
 
-	results := p.ParseVideos("https://www.tiktok.com/@testuser", 1, items)
+	results := p.ParseVideos("https://www.tiktok.com/@testuser", 1, "own", items)
 
 	// Only the recent video should be included.
 	if len(results) != 1 {
@@ -129,7 +129,7 @@ func TestParseVideos_MissingAuthorStats(t *testing.T) {
 		},
 	}
 
-	results := p.ParseVideos("https://www.tiktok.com/@testuser", 1, items)
+	results := p.ParseVideos("https://www.tiktok.com/@testuser", 1, "own", items)
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result for item with missing author/stats, got %d", len(results))
 	}
@@ -168,7 +168,7 @@ func TestParseVideos_VideoItemToModel(t *testing.T) {
 		},
 	}
 
-	results := p.ParseVideos("testurl", 42, items)
+	results := p.ParseVideos("testurl", 42, "own", items)
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
 	}

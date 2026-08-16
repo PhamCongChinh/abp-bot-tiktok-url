@@ -259,7 +259,11 @@ func (f *Fetcher) CrawlURL(ctx context.Context, page playwright.Page, targetURL 
 	mu.Unlock()
 
 	orgID := f.cfg.URLOrgMap[targetURL]
-	results := f.publisher.ParseVideos(targetURL, orgID, items)
+	sourceOwnership := f.cfg.URLSourceOwnershipMap[targetURL]
+	if sourceOwnership == "" {
+		sourceOwnership = "nature"
+	}
+	results := f.publisher.ParseVideos(targetURL, orgID, sourceOwnership, items)
 
 	// Pagination guard: enforce per-URL video limit (only meaningful for
 	// profile pages, which can yield many videos from one URL).
