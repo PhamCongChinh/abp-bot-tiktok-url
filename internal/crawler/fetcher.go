@@ -272,19 +272,17 @@ func (f *Fetcher) CrawlURL(ctx context.Context, page playwright.Page, targetURL 
 		results = results[:f.cfg.MaxVideosPerURL]
 	}
 
-	// Log the parsed results before pushing so they're visible even with the
-	// push disabled below.
+	// Log the parsed results before pushing so they're visible in logs too.
 	for _, v := range results {
 		post := parser.FromVideoItem(v)
 		payload, _ := json.Marshal(post)
 		log.Sugar().Infof("%s %q -> crawled video: %s", tag, targetURL, string(payload))
 	}
 
-	// TEMP: API push disabled for testing — parsed videos are only logged above.
-	// if len(results) > 0 {
-	// 	f.publisher.PushBatch(ctx, results)
-	// }
-	log.Sugar().Infof("%s %q -> %d videos parsed (API push disabled)", tag, targetURL, len(results))
+	if len(results) > 0 {
+		f.publisher.PushBatch(ctx, results)
+	}
+	log.Sugar().Infof("%s %q -> %d videos queued for API push", tag, targetURL, len(results))
 }
 
 // extractStatusCode reads TikTok's response status code, tolerating both the

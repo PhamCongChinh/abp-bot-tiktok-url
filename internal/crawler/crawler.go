@@ -199,11 +199,6 @@ func (c *Crawler) loadURLs() ([]string, map[string]int, map[string]string, error
 			)
 			continue
 		}
-		// TEMP: skip org_id 18576 for testing other URLs — remove after testing.
-		if matchedOrgID == 18576 {
-			c.log.Info("loadURLs: skipping org_id=18576 (test filter)", zap.String("url", u.URL))
-			continue
-		}
 		urls = append(urls, u.URL)
 		urlOrgMap[u.URL] = matchedOrgID
 		urlSourceOwnershipMap[u.URL] = u.SourceOwnership
