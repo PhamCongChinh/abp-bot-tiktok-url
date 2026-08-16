@@ -122,6 +122,8 @@ func (f *Fetcher) CrawlURLs(ctx context.Context, pw *playwright.Playwright, gpmC
 				default:
 				}
 
+				sessionLog.Sugar().Infof("%s -> crawling url %d/%d: %q", tag, i+urlIdx+1, total, targetURL)
+
 				page, err := f.scraper.CreatePageWithRetry(bctx, 3, sessionLog)
 				if err != nil {
 					sessionLog.Sugar().Infof("%s %q -> 0 videos pushed to API", tag, targetURL)
@@ -132,6 +134,7 @@ func (f *Fetcher) CrawlURLs(ctx context.Context, pw *playwright.Playwright, gpmC
 
 				if urlIdx < len(batch)-1 {
 					sleepSec := utils.RandInt(f.cfg.SleepMinURL, f.cfg.SleepMaxURL)
+					sessionLog.Sugar().Infof("%s -> waiting %ds before next url", tag, sleepSec)
 					select {
 					case <-time.After(time.Duration(sleepSec) * time.Second):
 					case <-ctx.Done():
@@ -144,6 +147,7 @@ func (f *Fetcher) CrawlURLs(ctx context.Context, pw *playwright.Playwright, gpmC
 		i += batchSize
 		if i < total {
 			restSec := utils.RandInt(f.cfg.RestMinSession, f.cfg.RestMaxSession)
+			sessionLog.Sugar().Infof("%s -> batch done (%d/%d urls), waiting %ds before next batch", tag, i, total, restSec)
 			select {
 			case <-time.After(time.Duration(restSec) * time.Second):
 			case <-ctx.Done():
