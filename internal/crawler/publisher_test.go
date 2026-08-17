@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -202,6 +203,57 @@ func TestPublisher_PushToAPI_Sync(t *testing.T) {
 	err := p.PushToAPI(context.Background(), videos)
 	if err != nil {
 		t.Fatalf("unexpected error from PushToAPI: %v", err)
+	}
+}
+
+func TestPublisher_PushToAPI_RoutesByOwnership(t *testing.T) {
+	var mu sync.Mutex
+	var paths []string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		paths = append(paths, r.URL.Path)
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	apiClient := api.NewClient(srv.URL, 10*time.Second, zap.NewNop())
+	p := NewPublisher(apiClient, zap.NewNop(), nil)
+	defer p.Shutdown()
+
+	videos := []models.VideoItem{
+		{VideoID: "v1", SourceURL: "kw", OrgID: 1, UniqueID: "u1", AuthID: "a1", AuthName: "User", SourceOwnership: "own"},
+		{VideoID: "v2", SourceURL: "kw", OrgID: 1, UniqueID: "u2", AuthID: "a2", AuthName: "User2", SourceOwnership: "nature"},
+		{VideoID: "v3", SourceURL: "kw", OrgID: 1, UniqueID: "u3", AuthID: "a3", AuthName: "User3", SourceOwnership: ""},
+	}
+
+	if err := p.PushToAPI(context.Background(), videos); err != nil {
+		t.Fatalf("unexpected error from PushToAPI: %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(paths) != 2 {
+		t.Fatalf("expected 2 requests (one per ownership group), got %d: %v", len(paths), paths)
+	}
+
+	var gotClassified, gotUnclassified bool
+	for _, path := range paths {
+		switch path {
+		case "/api/v1/posts/insert-posts":
+			gotClassified = true
+		case "/api/v1/posts/insert-unclassified-org-posts":
+			gotUnclassified = true
+		default:
+			t.Errorf("unexpected request path %q", path)
+		}
+	}
+	if !gotClassified {
+		t.Error("expected a request to insert-posts for source_ownership=own")
+	}
+	if !gotUnclassified {
+		t.Error("expected a request to insert-unclassified-org-posts for non-own source_ownership")
 	}
 }
 

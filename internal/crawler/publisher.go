@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -19,6 +20,11 @@ const (
 	publisherNumWorkers    = 3
 	publisherBatchMax      = 10
 	publisherFlushInterval = 5 * time.Second
+
+	// sourceOwnershipOwn is the source_ownership value that routes a post to
+	// the classified (insert-posts) endpoint. Everything else goes to the
+	// unclassified (insert-unclassified-org-posts) endpoint.
+	sourceOwnershipOwn = "own"
 )
 
 // Publisher handles video parsing and async batch API push operations.
@@ -122,22 +128,46 @@ func (p *Publisher) PushBatch(ctx context.Context, videos []models.VideoItem) {
 // PushToAPI synchronously converts and sends a batch of video items to the
 // backend API. This is used internally by workers and remains available for
 // direct synchronous calls in tests.
+//
+// A batch can mix videos from multiple source URLs with different
+// source_ownership values, so it is split in two before sending: videos
+// owned by us ("own") go to the classified endpoint, everything else
+// (e.g. "nature", empty) goes to the unclassified endpoint.
 func (p *Publisher) PushToAPI(ctx context.Context, videos []models.VideoItem) error {
 	if len(videos) == 0 {
 		return nil
 	}
 
-	posts := make([]parser.TiktokPost, 0, len(videos))
+	var ownPosts, otherPosts []parser.TiktokPost
 	for _, v := range videos {
-		posts = append(posts, parser.FromVideoItem(v))
+		post := parser.FromVideoItem(v)
+		if post.SourceOwnership == sourceOwnershipOwn {
+			ownPosts = append(ownPosts, post)
+		} else {
+			otherPosts = append(otherPosts, post)
+		}
 	}
 
-	// Retry once with backoff for transient API failures.
-	err := utils.RetryWithBackoff(ctx, 2, func() error {
-		return p.apiClient.PostClassified(ctx, posts)
-	})
-	if err != nil {
-		return fmt.Errorf("pushToAPI: %w", err)
+	var errs []error
+	if len(ownPosts) > 0 {
+		err := utils.RetryWithBackoff(ctx, 2, func() error {
+			return p.apiClient.PostClassified(ctx, ownPosts)
+		})
+		if err != nil {
+			errs = append(errs, fmt.Errorf("PostClassified: %w", err))
+		}
+	}
+	if len(otherPosts) > 0 {
+		err := utils.RetryWithBackoff(ctx, 2, func() error {
+			return p.apiClient.PostUnclassified(ctx, otherPosts)
+		})
+		if err != nil {
+			errs = append(errs, fmt.Errorf("PostUnclassified: %w", err))
+		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("pushToAPI: %w", errors.Join(errs...))
 	}
 	return nil
 }
